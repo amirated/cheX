@@ -1,0 +1,101 @@
+:root {
+  --bg: #14131a;
+  --panel: #1e1c26;
+  --ink: #ece4d4;
+  --muted: #9b93a6;
+  --accent: #f1c75b;
+  --danger: #e0413a;
+  color-scheme: dark;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--ink);
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.app {
+  height: 100dvh;
+  max-width: 640px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: max(12px, env(safe-area-inset-top)) 10px max(12px, env(safe-area-inset-bottom));
+}
+
+/* ── HUD ── */
+.hud {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--panel);
+  border-radius: 14px;
+}
+.hud-turn { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+.hud-text { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
+.hud-text strong { font-size: 15px; white-space: nowrap; }
+.hud-sub { font-size: 12px; color: var(--muted); }
+.swatch {
+  width: 22px; height: 22px; border-radius: 50%;
+  flex: none;
+  box-shadow: 0 0 0 2px #0e0c12, 0 0 0 3.5px #e6dac3;
+}
+.swatch-white { background: #f6f0e4; }
+.swatch-black { background: #26232e; }
+
+.status {
+  font-size: 12px; font-weight: 700; letter-spacing: .02em;
+  padding: 5px 9px; border-radius: 999px;
+  background: #2b2834; color: var(--muted); white-space: nowrap;
+}
+.status-check { background: #4a2420; color: #ffb4a8; }
+.status-checkmate { background: var(--danger); color: #fff; }
+.status-stalemate, .status-draw { background: #3c3550; color: #d8cff0; }
+
+.reset {
+  font: inherit; font-size: 13px; font-weight: 700;
+  min-height: 40px; padding: 0 14px;
+  border: 0; border-radius: 10px;
+  background: var(--accent); color: #241d10;
+  cursor: pointer; touch-action: manipulation;
+}
+.reset:active { transform: scale(.97); }
+
+/* ── Board ── */
+.stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.board-frame {
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 0 0 6px #2a2531, 0 18px 40px rgba(0,0,0,.55);
+}
+.board-canvas { display: block; touch-action: none; }
+
+.movelog {
+  min-height: 20px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: pre;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (min-width: 700px) {
+  .app { padding-top: 24px; padding-bottom: 24px; }
+}
