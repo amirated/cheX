@@ -1,17 +1,55 @@
 import { createGameState, gameReducer } from '../engine';
-import type { GameEvent, GameState, MoveAction } from '../types/game';
+import type { Color, GameEvent, GameState, MoveAction } from '../types/game';
+
+export interface SeatPresence {
+  taken: boolean;
+  connected: boolean;
+}
+
+/** Mirrors the server's `Presence` (chex_server::rooms::Presence). */
+export interface Presence {
+  white: SeatPresence;
+  black: SeatPresence;
+  spectators: number;
+}
+
+export interface TransportMeta {
+  mode: 'local' | 'online';
+  roomId: string | null;
+  /** Online: the colour this client controls; null = spectator. Local: null (controls both). */
+  seat: Color | null;
+  connection: 'connecting' | 'connected' | 'disconnected';
+  presence: Presence | null;
+  /** Last error from the server (rejected action, room not found, unreachable…). */
+  error: string | null;
+}
 
 /**
- * The seam between UI and game authority. V1 uses `LocalTransport` (the reducer
- * runs in the browser). Phase 2 swaps in `SocketTransport` with zero UI changes:
- * the Rust server runs the same reducer and broadcasts the resulting state/events.
+ * The seam between UI and game authority. `LocalTransport` runs the reducer in
+ * the browser; `SocketTransport` sends intents to the Rust server, which runs the
+ * same reducer and broadcasts the result. The UI can't tell the difference.
  */
 export interface GameTransport {
   getState(): GameState;
   send(action: MoveAction): void;
   /** Listener receives the new state plus only the events appended since the last update. */
   subscribe(listener: (state: GameState, newEvents: GameEvent[]) => void): () => void;
+  getMeta(): TransportMeta;
+  subscribeMeta(listener: () => void): () => void;
 }
+
+/** True when this client may move pieces of `color`. */
+export const controls = (meta: TransportMeta, color: Color): boolean =>
+  meta.mode === 'local' || meta.seat === color;
+
+const LOCAL_META: TransportMeta = {
+  mode: 'local',
+  roomId: null,
+  seat: null,
+  connection: 'connected',
+  presence: null,
+  error: null,
+};
 
 export class LocalTransport implements GameTransport {
   private state: GameState;
@@ -34,4 +72,7 @@ export class LocalTransport implements GameTransport {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
   };
+
+  getMeta = (): TransportMeta => LOCAL_META;
+  subscribeMeta = (): (() => void) => () => {};
 }

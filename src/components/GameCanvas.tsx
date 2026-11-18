@@ -22,12 +22,13 @@ interface Props {
   size: number;
   highlights: HighlightModel;
   onSquare: (c: Coord) => void;
+  flipped?: boolean;
 }
 
 /** Cap DPR at 3: beyond that mobile GPUs pay a lot of fill-rate for no visible gain. */
 const DPR = Math.min(window.devicePixelRatio || 1, 3);
 
-export function GameCanvas({ board, size, highlights, onSquare }: Props) {
+export function GameCanvas({ board, size, highlights, onSquare, flipped }: Props) {
   return (
     <Application
       width={size}
@@ -40,7 +41,7 @@ export function GameCanvas({ board, size, highlights, onSquare }: Props) {
       className="board-canvas"
     >
       <RendererSize size={size} />
-      <BoardView board={board} size={size} highlights={highlights} onSquare={onSquare} />
+      <BoardView board={board} size={size} highlights={highlights} onSquare={onSquare} flipped={flipped} />
     </Application>
   );
 }

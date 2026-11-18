@@ -99,3 +99,33 @@ html, body, #root {
 @media (min-width: 700px) {
   .app { padding-top: 24px; padding-bottom: 24px; }
 }
+
+/* ── Online bar ── */
+.online-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px 8px 12px;
+  background: var(--panel);
+  border-radius: 14px;
+  min-height: 52px;
+}
+.online-text { display: flex; flex-direction: column; flex: 1; min-width: 0; line-height: 1.2; }
+.online-text strong { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.online-hint, .online-error { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.online-bar > .online-hint { flex: 1; }
+.online-error { color: #ffb4a8; }
+.dot { width: 9px; height: 9px; border-radius: 50%; flex: none; background: #6b6478; }
+.dot-on { background: #5fd38a; box-shadow: 0 0 0 3px rgba(95, 211, 138, .18); }
+.dot-wait { background: var(--accent); }
+.dot-off { background: var(--danger); }
+.ghost {
+  font: inherit; font-size: 13px; font-weight: 700;
+  min-height: 36px; padding: 0 12px;
+  display: inline-flex; align-items: center;
+  border: 1px solid #3a3546; border-radius: 10px;
+  background: transparent; color: var(--ink);
+  text-decoration: none; cursor: pointer; touch-action: manipulation; white-space: nowrap;
+}
+.ghost:disabled { opacity: .6; }
+.ghost:active { transform: scale(.97); }

@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState, useSyncExternalStore } from 'react';
 import { findPiece, getPieceDef, isGameOver, legalMoves, pieceAt, sameCoord } from '../engine';
 import type { HighlightModel } from '../render/board';
-import type { GameTransport } from '../net/transport';
+import { controls, type GameTransport } from '../net/transport';
 import type { Coord, GameState } from '../types/game';
 
 /**
@@ -10,9 +10,11 @@ import type { Coord, GameState } from '../types/game';
  */
 export function useChessGame(transport: GameTransport) {
   const state: GameState = useSyncExternalStore(transport.subscribe, transport.getState);
+  const meta = useSyncExternalStore(transport.subscribeMeta, transport.getMeta);
   const [selected, setSelected] = useState<Coord | null>(null);
+  const myTurn = controls(meta, state.turn);
 
-  const legal = useMemo(() => (isGameOver(state) ? [] : legalMoves(state)), [state]);
+  const legal = useMemo(() => (isGameOver(state) || !myTurn ? [] : legalMoves(state)), [state, myTurn]);
   const selectedMoves = useMemo(
     () => (selected ? legal.filter((m) => sameCoord(m.from, selected)) : []),
     [legal, selected],
@@ -27,10 +29,10 @@ export function useChessGame(transport: GameTransport) {
         return;
       }
       const p = pieceAt(state.board, c);
-      if (p && p.color === state.turn && !sameCoord(selected, c)) setSelected(c);
+      if (p && p.color === state.turn && myTurn && !sameCoord(selected, c)) setSelected(c);
       else setSelected(null);
     },
-    [selectedMoves, selected, state, transport],
+    [selectedMoves, selected, state, transport, myTurn],
   );
 
   const reset = useCallback(() => {
@@ -62,5 +64,9 @@ export function useChessGame(transport: GameTransport) {
     [state.events],
   );
 
-  return { state, selected, highlights, onSquare, reset, sanLog };
+  // Drop a stale selection when the turn passes (e.g. opponent moved online).
+  const activeSelected = myTurn ? selected : null;
+  const activeHighlights = activeSelected === selected ? highlights : { ...highlights, selected: null, quietTargets: [], captureTargets: [] };
+
+  return { state, meta, myTurn, selected: activeSelected, highlights: activeHighlights, onSquare, reset, sanLog };
 }

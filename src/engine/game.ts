@@ -42,7 +42,12 @@ export function standardBoard(): BoardState {
   return b;
 }
 
-export function createGameState(board: BoardState = standardBoard(), ruleset: Ruleset = STANDARD_RULESET): GameState {
+/** `nextSeq` lets a reset keep event sequence numbers monotonic across games in a room. */
+export function createGameState(
+  board: BoardState = standardBoard(),
+  ruleset: Ruleset = STANDARD_RULESET,
+  nextSeq = 0,
+): GameState {
   const state: GameState = {
     schemaVersion: 1,
     board,
@@ -56,7 +61,7 @@ export function createGameState(board: BoardState = standardBoard(), ruleset: Ru
     ruleset,
     history: [],
     events: [],
-    nextSeq: 0,
+    nextSeq,
     nextPieceId: Object.keys(board.pieces).length,
   };
   return pushEvents(state, [{ type: 'gameStarted' }]);
@@ -175,7 +180,7 @@ export function applyMove(state: GameState, move: Move, legalBefore: Move[] = le
 export function gameReducer(state: GameState, action: MoveAction): GameState {
   switch (action.type) {
     case 'reset':
-      return createGameState(standardBoard(), action.ruleset ?? state.ruleset);
+      return createGameState(standardBoard(), action.ruleset ?? state.ruleset, state.nextSeq);
 
     case 'move': {
       const reject = (reason: string) => pushEvents(state, [{ type: 'rejected', action, reason }]);

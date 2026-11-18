@@ -9,6 +9,12 @@ npm test           # perft and rules tests
 npm run build
 ```
 
+## Online multiplayer
+
+Start the Rust server from `cheX-BE` (`cargo run`, which listens on :4000), then tap **Play online**. The game creates a room and moves you to `?room=CODE`. Tap **Invite** to share the link. The first player to join is White, the second is Black, and anyone after that spectates. The board is flipped for Black. Your seat is saved in `localStorage`, so refreshing the page or losing the connection gives you the same colour back. Set `VITE_SERVER_URL` if the server isn't on `<page host>:4000` (see `.env.example`).
+
+Without `?room=`, the game runs fully offline as local pass-and-play, exactly as before.
+
 ## Folder structure
 
 ```
@@ -40,9 +46,10 @@ src/
 │   ├── GameCanvas.tsx         # <Application>, DPR-aware, resizes renderer
 │   ├── BoardView.tsx          # board, labels, highlights, input
 │   ├── PieceView.tsx          # per-piece ticker animation (slide, Z-lift, shadow)
-│   └── Hud.tsx
+│   ├── Hud.tsx
+│   └── OnlineBar.tsx          # room code, seat, opponent presence, invite/leave
 ├── hooks/                     # useChessGame (transport → React), useBoardSize
-├── net/                       # GameTransport seam: LocalTransport (V1), SocketTransport (Phase 2 sketch)
+├── net/                       # GameTransport seam: LocalTransport (offline), SocketTransport (cheX-BE server)
 └── App.tsx / main.tsx / index.css
 tests/engine.test.ts           # perft: start d4, Kiwipete d3, positions 3/4/5, plus reducer tests
 ```
@@ -52,4 +59,4 @@ tests/engine.test.ts           # perft: start d4, Kiwipete d3, positions 3/4/5, 
 - **Fairy piece:** call `registerPiece({...movement rules})` and optionally `registerPieceShape(kind, shapes)`. If you skip the shape, the piece is drawn as a generic medallion.
 - **Tile effect:** call `registerTileModifier`, then put `{ kind, ... }` into `board.tiles[i].modifiers`.
 - **Relic:** call `registerRuleModifier({ transformMoves?, afterMove? })` and add `{ id, owner }` to `state.ruleset.modifiers`.
-- **Multiplayer:** swap `LocalTransport` for `SocketTransport` in `App.tsx`. The server runs the same `(state, action) → state` reducer.
+- **Rules changes:** the server runs a Rust port of `src/engine`. Change both, then run the parity test in `cheX-BE` (see its README).

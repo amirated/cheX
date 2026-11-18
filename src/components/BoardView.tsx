@@ -1,7 +1,7 @@
 import { Rectangle, TextStyle, type FederatedPointerEvent, type Graphics } from 'pixi.js';
 import { useCallback, useMemo } from 'react';
 import { FILES, indexOf } from '../engine';
-import { drawBoard, drawHighlights, isLightSquare, pixelToCoord, type HighlightModel } from '../render/board';
+import { drawBoard, drawHighlights, isLightSquare, pixelToCoord, type HighlightModel, type Orientation } from '../render/board';
 import { THEME } from '../render/theme';
 import type { BoardState, Coord } from '../types/game';
 import { PieceView } from './PieceView';
@@ -11,26 +11,32 @@ interface Props {
   size: number;
   highlights: HighlightModel;
   onSquare: (c: Coord) => void;
+  /** Black at the bottom (online play as Black). */
+  flipped?: boolean;
 }
 
 /** Board + labels + highlight overlay + piece layer, all procedural. */
-export function BoardView({ board, size, highlights, onSquare }: Props) {
+export function BoardView({ board, size, highlights, onSquare, flipped = false }: Props) {
   const tile = size / board.width;
+  const orient: Orientation = useMemo(
+    () => ({ tile, width: board.width, height: board.height, flipped }),
+    [tile, board.width, board.height, flipped],
+  );
 
   // Board geometry only depends on size + tile modifiers, not on piece moves.
   const tilesKey = useMemo(() => board.tiles.map((t) => t.modifiers.map((m) => m.kind).join('+')).join('|'), [board.tiles]);
   const tilesBoard = useMemo(() => board, [tilesKey, board.width, board.height]); // eslint-disable-line react-hooks/exhaustive-deps
-  const drawTiles = useCallback((g: Graphics) => drawBoard(g, tilesBoard, tile), [tilesBoard, tile]);
-  const drawHl = useCallback((g: Graphics) => drawHighlights(g, highlights, tile, board.height), [highlights, tile, board.height]);
+  const drawTiles = useCallback((g: Graphics) => drawBoard(g, tilesBoard, orient), [tilesBoard, orient]);
+  const drawHl = useCallback((g: Graphics) => drawHighlights(g, highlights, orient), [highlights, orient]);
   const hitArea = useMemo(() => new Rectangle(0, 0, size, size), [size]);
 
   const onDown = useCallback(
     (e: FederatedPointerEvent) => {
       const p = e.getLocalPosition(e.currentTarget);
-      const c = pixelToCoord(p.x, p.y, tile, board);
+      const c = pixelToCoord(p.x, p.y, orient);
       if (c) onSquare(c);
     },
-    [tile, board, onSquare],
+    [orient, onSquare],
   );
 
   // Coordinate labels: files on the bottom row, ranks on the left column.
@@ -45,16 +51,17 @@ export function BoardView({ board, size, highlights, onSquare }: Props) {
         fill: light ? THEME.board.labelOnLight : THEME.board.labelOnDark,
       });
     const out: { key: string; text: string; x: number; y: number; anchor: [number, number]; style: TextStyle }[] = [];
-    for (let f = 0; f < board.width; f++) {
-      const c = { file: f, rank: 0 };
-      out.push({ key: `f${f}`, text: FILES[f], x: (f + 1) * tile - pad, y: size - pad * 0.6, anchor: [1, 1], style: style(isLightSquare(c)) });
+    // Labels follow screen position: files along the bottom row, ranks down the left column.
+    for (let col = 0; col < board.width; col++) {
+      const c = { file: flipped ? board.width - 1 - col : col, rank: flipped ? board.height - 1 : 0 };
+      out.push({ key: `f${col}`, text: FILES[c.file], x: (col + 1) * tile - pad, y: size - pad * 0.6, anchor: [1, 1], style: style(isLightSquare(c)) });
     }
-    for (let r = 0; r < board.height; r++) {
-      const c = { file: 0, rank: r };
-      out.push({ key: `r${r}`, text: String(r + 1), x: pad, y: (board.height - 1 - r) * tile + pad * 0.6, anchor: [0, 0], style: style(isLightSquare(c)) });
+    for (let row = 0; row < board.height; row++) {
+      const c = { file: flipped ? board.width - 1 : 0, rank: flipped ? row : board.height - 1 - row };
+      out.push({ key: `r${row}`, text: String(c.rank + 1), x: pad, y: row * tile + pad * 0.6, anchor: [0, 0], style: style(isLightSquare(c)) });
     }
     return out;
-  }, [tile, size, board.width, board.height]);
+  }, [tile, size, board.width, board.height, flipped]);
 
   // Stable order by id so React keys map 1:1 to Pixi containers (enables move animation).
   const pieces = useMemo(
@@ -80,7 +87,7 @@ export function BoardView({ board, size, highlights, onSquare }: Props) {
       <pixiGraphics draw={drawHl} />
       <pixiContainer sortableChildren>
         {pieces.map(({ p, at }) => (
-          <PieceView key={p.id} piece={p} at={at} tile={tile} boardHeight={board.height} lifted={p.id === selectedId} />
+          <PieceView key={p.id} piece={p} at={at} orient={orient} lifted={p.id === selectedId} />
         ))}
       </pixiContainer>
     </pixiContainer>

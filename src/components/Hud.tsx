@@ -16,23 +16,38 @@ interface Props {
   winner: Color | null;
   moveNumber: number;
   onReset: () => void;
+  /** Online only: the colour this client plays; null = spectating. undefined = local game. */
+  seat?: Color | null;
 }
 
-export function Hud({ turn, status, winner, moveNumber, onReset }: Props) {
+function headline(over: boolean, turn: Color, winner: Color | null, seat: Color | null | undefined): string {
+  if (over) {
+    if (!winner) return 'Game drawn';
+    if (seat) return winner === seat ? 'You win' : 'You lose';
+    return `${cap(winner)} wins`;
+  }
+  if (seat === undefined) return `${cap(turn)} to move`;
+  if (seat === null) return `${cap(turn)} to move · watching`;
+  return turn === seat ? 'Your move' : "Opponent's move";
+}
+
+export function Hud({ turn, status, winner, moveNumber, onReset, seat }: Props) {
   const over = status === 'checkmate' || status === 'stalemate' || status === 'draw';
   return (
     <header className="hud">
       <div className="hud-turn" aria-live="polite">
         <span className={`swatch swatch-${over && winner ? winner : turn}`} />
         <div className="hud-text">
-          <strong>{over ? (winner ? `${cap(winner)} wins` : 'Game drawn') : `${cap(turn)} to move`}</strong>
+          <strong>{headline(over, turn, winner, seat)}</strong>
           <span className="hud-sub">Move {moveNumber}</span>
         </div>
       </div>
       <span className={`status status-${status}`}>{STATUS_LABEL[status]}</span>
-      <button className="reset" onClick={onReset} type="button">
-        Reset Board
-      </button>
+      {(seat === undefined || (seat !== null && over)) && (
+        <button className="reset" onClick={onReset} type="button">
+          {seat === undefined ? 'Reset Board' : 'Rematch'}
+        </button>
+      )}
     </header>
   );
 }

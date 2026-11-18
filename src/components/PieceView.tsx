@@ -2,15 +2,14 @@ import { useTick } from '@pixi/react';
 import type { Container, Graphics, Ticker } from 'pixi.js';
 import { useCallback, useEffect, useRef } from 'react';
 import { drawPiece, drawShadow } from '../render/pieces/drawPiece';
-import { tileCenter } from '../render/board';
+import { tileCenter, type Orientation } from '../render/board';
 import { THEME } from '../render/theme';
 import type { Coord, Piece } from '../types/game';
 
 interface Props {
   piece: Piece;
   at: Coord;
-  tile: number;
-  boardHeight: number;
+  orient: Orientation;
   lifted: boolean;
 }
 
@@ -21,13 +20,14 @@ const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t 
  * (slide between tiles, simulated Z-lift, shadow offset) is done by mutating
  * transforms inside the Pixi ticker — no React re-renders per frame.
  */
-export function PieceView({ piece, at, tile, boardHeight, lifted }: Props) {
+export function PieceView({ piece, at, orient, lifted }: Props) {
+  const tile = orient.tile;
   const root = useRef<Container>(null);
   const body = useRef<Container>(null);
   const shadow = useRef<Graphics>(null);
 
   const pieceSize = tile * 0.86;
-  const target = tileCenter(at, tile, boardHeight);
+  const target = tileCenter(at, orient);
 
   // Animation state lives in a ref: survives re-renders, never triggers them.
   const anim = useRef({
@@ -40,18 +40,19 @@ export function PieceView({ piece, at, tile, boardHeight, lifted }: Props) {
     t: 1,
     lift: 0,
     tile,
+    flipped: orient.flipped,
   });
 
   // New destination → start a slide from wherever we are now. A resize snaps instead.
   useEffect(() => {
     const a = anim.current;
-    if (a.tile !== tile) {
-      Object.assign(a, { x: target.x, y: target.y, fromX: target.x, fromY: target.y, toX: target.x, toY: target.y, t: 1, tile });
+    if (a.tile !== tile || a.flipped !== orient.flipped) {
+      Object.assign(a, { x: target.x, y: target.y, fromX: target.x, fromY: target.y, toX: target.x, toY: target.y, t: 1, tile, flipped: orient.flipped });
       return;
     }
     if (a.toX === target.x && a.toY === target.y) return;
     Object.assign(a, { fromX: a.x, fromY: a.y, toX: target.x, toY: target.y, t: 0 });
-  }, [target.x, target.y, tile]);
+  }, [target.x, target.y, tile, orient.flipped]);
 
   const drawBody = useCallback((g: Graphics) => drawPiece(g, piece.kind, piece.color, pieceSize), [piece.kind, piece.color, pieceSize]);
   const drawShadowCb = useCallback((g: Graphics) => drawShadow(g, pieceSize), [pieceSize]);

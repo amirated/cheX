@@ -1,17 +1,39 @@
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { GameCanvas } from './components/GameCanvas';
 import { Hud } from './components/Hud';
+import { OnlineBar } from './components/OnlineBar';
 import { useBoardSize } from './hooks/useBoardSize';
 import { useChessGame } from './hooks/useChessGame';
-import { LocalTransport } from './net/transport';
+import { createOnlineRoom, SERVER_URL, SocketTransport } from './net/socketTransport';
+import { LocalTransport, type GameTransport } from './net/transport';
+
+/** `?room=CODE` → online game against the Rust server; otherwise local pass-and-play.
+ *  Created once at module scope so React StrictMode's double-mount can't open two sockets. */
+function createTransport(): GameTransport {
+  const room = new URLSearchParams(location.search).get('room');
+  return room ? new SocketTransport(SERVER_URL, room.toUpperCase()) : new LocalTransport();
+}
+const transport = createTransport();
 
 export default function App() {
-  // Phase 2: replace with `new SocketTransport(url, roomId)` — nothing else changes.
-  const transport = useMemo(() => new LocalTransport(), []);
-  const { state, highlights, onSquare, reset, sanLog } = useChessGame(transport);
+  const { state, meta, highlights, onSquare, reset, sanLog } = useChessGame(transport);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   const stageRef = useRef<HTMLDivElement>(null);
   const size = useBoardSize(stageRef);
+
+  const playOnline = async () => {
+    setCreating(true);
+    setCreateError(null);
+    try {
+      const id = await createOnlineRoom();
+      location.search = `?room=${id}`; // reload into the room
+    } catch {
+      setCreateError(`Can't reach the game server at ${SERVER_URL}`);
+      setCreating(false);
+    }
+  };
 
   // Pair plies into "1. e4 e5" and show the most recent few.
   const moves = useMemo(() => {
@@ -28,11 +50,19 @@ export default function App() {
         winner={state.winner}
         moveNumber={state.fullmoveNumber}
         onReset={reset}
+        seat={meta.mode === 'online' ? meta.seat : undefined}
       />
+      <OnlineBar meta={meta} onPlayOnline={playOnline} creating={creating} createError={createError} />
       <div className="stage" ref={stageRef}>
         {size > 0 && (
           <div className="board-frame" style={{ width: size, height: size }}>
-            <GameCanvas board={state.board} size={size} highlights={highlights} onSquare={onSquare} />
+            <GameCanvas
+              board={state.board}
+              size={size}
+              highlights={highlights}
+              onSquare={onSquare}
+              flipped={meta.seat === 'black'}
+            />
           </div>
         )}
       </div>
