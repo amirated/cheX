@@ -17,6 +17,14 @@ Online games show a player bar with each clock above and below the board. The se
 
 Without `?room=`, the game runs fully offline as local pass-and-play, exactly as before.
 
+## Themes
+
+There are two cyber themes, **Neon grid** and **Night city** (the default), and each can show pieces **filled** or as **outlines**. Players pick these in the settings panel (the sliders icon in the header). The choice is saved per device in `localStorage` and never sent to the server, so each player sees their own look.
+
+- **Pixi side:** `src/render/theme.ts` holds board, highlight and piece colours for every theme and piece-style pair. The glow is a wide, faint stroke drawn once, with no filters, so it costs nothing per frame.
+- **UI side:** `src/index.css` defines matching CSS tokens under `[data-theme="…"]`. Night city's cut corners use `clip-path`; Neon grid's glow uses `box-shadow`.
+- **Adding a theme:** add an entry to `THEMES`, add a `[data-theme]` block in the CSS, and it appears in the settings panel automatically.
+
 ## Folder structure
 
 ```
@@ -41,8 +49,9 @@ src/
 │   ├── game.ts                # createGameState, gameReducer(state, action), SAN, status
 │   ├── fen.ts                 # FEN import (tests/puzzles)
 │   └── setup.ts / index.ts    # registry bootstrap + public API
+├── prefs/preferences.ts       # per-device theme + piece style (localStorage)
 ├── render/                    # Pixi drawing functions (no React)
-│   ├── theme.ts
+│   ├── theme.ts               # Neon grid / Night city, filled + outline piece looks
 │   ├── board.ts               # tiles, highlights, pixel<->coord
 │   └── pieces/{shapes,drawPiece}.ts  # piece silhouettes as vector data → PIXI.Graphics
 ├── components/                # React + @pixi/react
@@ -52,6 +61,7 @@ src/
 │   ├── Hud.tsx
 │   ├── OnlineBar.tsx          # room code, seat, opponent presence, invite/leave
 │   ├── PlayerBar.tsx          # player identity + clock
+│   ├── SettingsPanel.tsx      # theme + piece-style picker
 │   └── TimeControlPicker.tsx  # presets / custom / no clock
 ├── hooks/                     # useChessGame (transport → React), useBoardSize
 ├── net/                       # GameTransport seam: LocalTransport (offline), SocketTransport (cheX-BE server)

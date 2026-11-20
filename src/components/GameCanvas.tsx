@@ -2,6 +2,7 @@ import { Application, extend, useApplication } from '@pixi/react';
 import { Container, Graphics, Text } from 'pixi.js';
 import { useCallback, useEffect, useState } from 'react';
 import type { HighlightModel } from '../render/board';
+import type { PieceStyle, Theme } from '../render/theme';
 import type { BoardState, Coord } from '../types/game';
 import { BoardView } from './BoardView';
 
@@ -23,12 +24,14 @@ interface Props {
   highlights: HighlightModel;
   onSquare: (c: Coord) => void;
   flipped?: boolean;
+  theme: Theme;
+  pieceStyle: PieceStyle;
 }
 
 /** Cap DPR at 3: beyond that mobile GPUs pay a lot of fill-rate for no visible gain. */
 const DPR = Math.min(window.devicePixelRatio || 1, 3);
 
-export function GameCanvas({ board, size, highlights, onSquare, flipped }: Props) {
+export function GameCanvas({ board, size, highlights, onSquare, flipped, theme, pieceStyle }: Props) {
   // @pixi/react's first render awaits WebGL init, then commits the children it started
   // with — overwriting any newer props rendered meanwhile (e.g. the room state that
   // arrived while the canvas was initialising). Re-render once init completes so the
@@ -49,7 +52,15 @@ export function GameCanvas({ board, size, highlights, onSquare, flipped }: Props
       className="board-canvas"
     >
       <RendererSize size={size} />
-      <BoardView board={board} size={size} highlights={highlights} onSquare={onSquare} flipped={flipped} />
+      <BoardView
+        board={board}
+        size={size}
+        highlights={highlights}
+        onSquare={onSquare}
+        flipped={flipped}
+        theme={theme}
+        pieceStyle={pieceStyle}
+      />
     </Application>
   );
 }

@@ -1,6 +1,6 @@
 import type { Graphics } from 'pixi.js';
-import type { Color, PieceKind } from '../../types/game';
-import { THEME } from '../theme';
+import type { PieceKind } from '../../types/game';
+import type { PieceLook } from '../theme';
 import { shapesFor, type ShapeGeom } from './shapes';
 
 /** Trace one shape into the Graphics' current path, mapping the 100-unit box onto `size` px, centred at (0,0). */
@@ -39,47 +39,58 @@ function trace(g: Graphics, s: ShapeGeom, k: number): void {
 
 /**
  * Draw a piece into `g`, centred on the Graphics' origin, fitting a `size`×`size` box.
- * Pure vector geometry — no textures. Called only when kind/color/size change.
+ * Pure vector geometry — no textures, no filters. Called only when kind/look/size change.
  */
-export function drawPiece(g: Graphics, kind: PieceKind, color: Color, size: number): void {
+export function drawPiece(g: Graphics, kind: PieceKind, look: PieceLook, size: number): void {
   const k = size / 100;
-  const style = THEME.pieces[color];
   const shapes = shapesFor(kind);
   const line = Math.max(1.25, 4 * k);
+  const bodies = shapes.filter((s) => (s.role ?? 'body') === 'body');
 
   g.clear();
 
-  // Pass 1 — dark rim behind black pieces so they pop on any tile color.
-  if (style.rim !== null) {
-    for (const s of shapes) {
-      if ((s.role ?? 'body') !== 'body') continue;
+  // Pass 1 — soft glow: a wide, faint stroke in the piece's brightest colour.
+  if (look.glowAlpha > 0) {
+    const glow = look.fillAlpha >= 1 ? look.fill : look.stroke;
+    for (const s of bodies) {
       trace(g, s, k);
-      g.stroke({ width: line * 2.4, color: style.rim, join: 'round' });
+      g.stroke({ width: line * 3.4, color: glow, alpha: look.glowAlpha, join: 'round' });
     }
   }
 
-  // Pass 2 — fills, outlines, details.
+  // Pass 2 — dark rim behind the silhouette so it reads on any tile colour.
+  if (look.rim !== null) {
+    for (const s of bodies) {
+      trace(g, s, k);
+      g.stroke({ width: line * 2.4, color: look.rim, join: 'round' });
+    }
+  }
+
+  // Pass 3 — fills, outlines, details.
   for (const s of shapes) {
     const role = s.role ?? 'body';
     trace(g, s, k);
     if (role === 'body') {
-      g.fill({ color: style.fill });
-      g.stroke({ width: line, color: style.stroke, join: 'round' });
+      g.fill({ color: look.fill, alpha: look.fillAlpha });
+      g.stroke({ width: line, color: look.stroke, join: 'round' });
     } else if (role === 'accent') {
-      g.fill({ color: style.stroke });
+      g.fill({ color: look.accent });
     } else {
-      g.stroke({ width: line * 0.75, color: style.stroke, cap: 'round', join: 'round' });
+      g.stroke({ width: line * 0.75, color: look.accent, cap: 'round', join: 'round' });
     }
   }
 }
 
 /** Soft elliptical contact shadow, drawn once; animated via alpha/scale/offset. */
-export function drawShadow(g: Graphics, size: number): void {
+export function drawShadow(g: Graphics, size: number, shadow: { color: number; alpha: number }): void {
   g.clear();
   const rx = size * 0.3;
   const ry = size * 0.09;
   // three stacked ellipses fake a blur without filters (cheap on mobile GPUs)
   for (let i = 0; i < 3; i++) {
-    g.ellipse(0, 0, rx * (1 + i * 0.18), ry * (1 + i * 0.3)).fill({ color: THEME.shadow, alpha: 0.18 - i * 0.05 });
+    g.ellipse(0, 0, rx * (1 + i * 0.18), ry * (1 + i * 0.3)).fill({
+      color: shadow.color,
+      alpha: shadow.alpha * (1 - i * 0.3) * 0.5,
+    });
   }
 }

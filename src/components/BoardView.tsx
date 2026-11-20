@@ -2,7 +2,7 @@ import { Rectangle, TextStyle, type FederatedPointerEvent, type Graphics } from 
 import { useCallback, useMemo, useRef } from 'react';
 import { FILES, indexOf } from '../engine';
 import { drawBoard, drawHighlights, isLightSquare, pixelToCoord, type HighlightModel, type Orientation } from '../render/board';
-import { THEME } from '../render/theme';
+import type { PieceStyle, Theme } from '../render/theme';
 import type { BoardState, Coord } from '../types/game';
 import { PieceView } from './PieceView';
 
@@ -13,10 +13,12 @@ interface Props {
   onSquare: (c: Coord) => void;
   /** Black at the bottom (online play as Black). */
   flipped?: boolean;
+  theme: Theme;
+  pieceStyle: PieceStyle;
 }
 
 /** Board + labels + highlight overlay + piece layer, all procedural. */
-export function BoardView({ board, size, highlights, onSquare, flipped = false }: Props) {
+export function BoardView({ board, size, highlights, onSquare, flipped = false, theme, pieceStyle }: Props) {
   const tile = size / board.width;
   const orient: Orientation = useMemo(
     () => ({ tile, width: board.width, height: board.height, flipped }),
@@ -26,8 +28,8 @@ export function BoardView({ board, size, highlights, onSquare, flipped = false }
   // Board geometry only depends on size + tile modifiers, not on piece moves.
   const tilesKey = useMemo(() => board.tiles.map((t) => t.modifiers.map((m) => m.kind).join('+')).join('|'), [board.tiles]);
   const tilesBoard = useMemo(() => board, [tilesKey, board.width, board.height]); // eslint-disable-line react-hooks/exhaustive-deps
-  const drawTiles = useCallback((g: Graphics) => drawBoard(g, tilesBoard, orient), [tilesBoard, orient]);
-  const drawHl = useCallback((g: Graphics) => drawHighlights(g, highlights, orient), [highlights, orient]);
+  const drawTiles = useCallback((g: Graphics) => drawBoard(g, tilesBoard, orient, theme), [tilesBoard, orient, theme]);
+  const drawHl = useCallback((g: Graphics) => drawHighlights(g, highlights, orient, theme), [highlights, orient, theme]);
   const hitArea = useMemo(() => new Rectangle(0, 0, size, size), [size]);
 
   // Pixi keeps the first pointer handler it was given, so a handler closing over props
@@ -51,7 +53,7 @@ export function BoardView({ board, size, highlights, onSquare, flipped = false }
         fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
         fontSize,
         fontWeight: '700',
-        fill: light ? THEME.board.labelOnLight : THEME.board.labelOnDark,
+        fill: light ? theme.board.labelOnLight : theme.board.labelOnDark,
       });
     const out: { key: string; text: string; x: number; y: number; anchor: [number, number]; style: TextStyle }[] = [];
     // Labels follow screen position: files along the bottom row, ranks down the left column.
@@ -64,7 +66,7 @@ export function BoardView({ board, size, highlights, onSquare, flipped = false }
       out.push({ key: `r${row}`, text: String(c.rank + 1), x: pad, y: row * tile + pad * 0.6, anchor: [0, 0], style: style(isLightSquare(c)) });
     }
     return out;
-  }, [tile, size, board.width, board.height, flipped]);
+  }, [tile, size, board.width, board.height, flipped, theme]);
 
   // Stable order by id so React keys map 1:1 to Pixi containers (enables move animation).
   const pieces = useMemo(
@@ -90,7 +92,15 @@ export function BoardView({ board, size, highlights, onSquare, flipped = false }
       <pixiGraphics draw={drawHl} />
       <pixiContainer sortableChildren>
         {pieces.map(({ p, at }) => (
-          <PieceView key={p.id} piece={p} at={at} orient={orient} lifted={p.id === selectedId} />
+          <PieceView
+            key={p.id}
+            piece={p}
+            at={at}
+            orient={orient}
+            lifted={p.id === selectedId}
+            look={theme.pieces[pieceStyle][p.color]}
+            shadow={theme.shadow}
+          />
         ))}
       </pixiContainer>
     </pixiContainer>

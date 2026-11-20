@@ -3,6 +3,9 @@ import { GameCanvas } from './components/GameCanvas';
 import { Hud } from './components/Hud';
 import { OnlineBar } from './components/OnlineBar';
 import { PlayerBar } from './components/PlayerBar';
+import { SettingsButton, SettingsPanel } from './components/SettingsPanel';
+import { usePreferences } from './prefs/preferences';
+import { THEMES } from './render/theme';
 import { useBoardSize } from './hooks/useBoardSize';
 import { useChessGame } from './hooks/useChessGame';
 import { useClock } from './hooks/useClock';
@@ -25,6 +28,8 @@ const PLAYER_BAR_PX = 48;
 export default function App() {
   const { state, meta, highlights, onSquare, reset, resign, sanLog } = useChessGame(transport);
   const clock = useClock(transport);
+  const prefs = usePreferences();
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
@@ -89,7 +94,9 @@ export default function App() {
         onReset={reset}
         onResign={resign}
         seat={online ? meta.seat : undefined}
+        extra={<SettingsButton open={settingsOpen} onClick={() => setSettingsOpen((o) => !o)} />}
       />
+      {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
       <OnlineBar
         meta={meta}
         onPlayOnline={playOnline}
@@ -108,6 +115,8 @@ export default function App() {
                 highlights={highlights}
                 onSquare={onSquare}
                 flipped={meta.seat === 'black'}
+                theme={THEMES[prefs.theme]}
+                pieceStyle={prefs.pieceStyle}
               />
             </div>
             {online && bar(bottom)}
