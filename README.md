@@ -11,7 +11,9 @@ npm run build
 
 ## Online multiplayer
 
-Start the Rust server from `cheX-BE` (`cargo run`, which listens on :4000), then tap **Play online**. The game creates a room and moves you to `?room=CODE`. Tap **Invite** to share the link. The first player to join is White, the second is Black, and anyone after that spectates. The board is flipped for Black. Your seat is saved in `localStorage`, so refreshing the page or losing the connection gives you the same colour back. Set `VITE_SERVER_URL` if the server isn't on `<page host>:4000` (see `.env.example`).
+Start the Rust server from `cheX-BE` (`cargo run`, which listens on :4000), then tap **Play online** and pick a time control (six presets, Custom, or No clock). The game creates a room and moves you to `?room=CODE`. Tap **Invite** to share the link. The first player to join is White, the second is Black, and anyone after that spectates. The board is flipped for Black. Your seat is saved in `localStorage`, so refreshing the page or losing the connection gives you the same colour back. Set `VITE_SERVER_URL` if the server isn't on `<page host>:4000` (see `.env.example`).
+
+Online games show a player bar with each clock above and below the board. The server owns the clocks; the page only renders them, counting down locally between updates. Clocks turn amber when time is low and red, with tenths of a second, when it's critical. You can resign (tap twice), and the rematch keeps the same time control.
 
 Without `?room=`, the game runs fully offline as local pass-and-play, exactly as before.
 
@@ -19,6 +21,7 @@ Without `?room=`, the game runs fully offline as local pass-and-play, exactly as
 
 ```
 src/
+├── types/clock.ts             # clock types, presets, local countdown + formatting
 ├── types/game.ts              # Serializable schema (BoardState, Piece, TileModifier, Move, MoveAction, GameEvent…)
 ├── engine/                    # Pure TS rules engine with no React or Pixi imports, ready to port to Rust
 │   ├── board.ts               # coords, indexing, cloning helpers
@@ -47,7 +50,9 @@ src/
 │   ├── BoardView.tsx          # board, labels, highlights, input
 │   ├── PieceView.tsx          # per-piece ticker animation (slide, Z-lift, shadow)
 │   ├── Hud.tsx
-│   └── OnlineBar.tsx          # room code, seat, opponent presence, invite/leave
+│   ├── OnlineBar.tsx          # room code, seat, opponent presence, invite/leave
+│   ├── PlayerBar.tsx          # player identity + clock
+│   └── TimeControlPicker.tsx  # presets / custom / no clock
 ├── hooks/                     # useChessGame (transport → React), useBoardSize
 ├── net/                       # GameTransport seam: LocalTransport (offline), SocketTransport (cheX-BE server)
 └── App.tsx / main.tsx / index.css

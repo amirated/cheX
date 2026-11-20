@@ -35,6 +35,10 @@ export function useChessGame(transport: GameTransport) {
     [selectedMoves, selected, state, transport, myTurn],
   );
 
+  const resign = useCallback(() => {
+    if (meta.mode === 'online' && meta.seat) transport.send({ type: 'resign', color: meta.seat });
+  }, [meta, transport]);
+
   const reset = useCallback(() => {
     setSelected(null);
     transport.send({ type: 'reset' });
@@ -68,5 +72,5 @@ export function useChessGame(transport: GameTransport) {
   const activeSelected = myTurn ? selected : null;
   const activeHighlights = activeSelected === selected ? highlights : { ...highlights, selected: null, quietTargets: [], captureTargets: [] };
 
-  return { state, meta, myTurn, selected: activeSelected, highlights: activeHighlights, onSquare, reset, sanLog };
+  return { state, meta, myTurn, selected: activeSelected, highlights: activeHighlights, onSquare, reset, resign, sanLog };
 }

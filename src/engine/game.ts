@@ -93,8 +93,30 @@ function evaluateStatus(state: GameState): { status: GameStatus; winner: Color |
   return { status: inCheck ? 'check' : 'inProgress', winner: null };
 }
 
-export const isGameOver = (s: GameState): boolean =>
-  s.status === 'checkmate' || s.status === 'stalemate' || s.status === 'draw';
+const GAME_OVER: ReadonlySet<GameStatus> = new Set(['checkmate', 'stalemate', 'draw', 'timeout', 'resigned']);
+
+export const isGameOver = (s: GameState): boolean => GAME_OVER.has(s.status);
+
+/**
+ * Could `color` deliver checkmate by any sequence of legal moves? Used to decide
+ * whether running out of time loses or draws. Deliberately conservative: only a
+ * bare king, or king + one bishop/knight against a bare king, counts as "cannot".
+ */
+export function canPossiblyMate(board: BoardState, color: Color): boolean {
+  const others = (c: Color) =>
+    Object.values(board.pieces).filter((p) => p.color === c && !getPieceDef(p.kind).royal);
+  const mine = others(color);
+  if (mine.length === 0) return false;
+  if (mine.length === 1 && (mine[0].kind === 'knight' || mine[0].kind === 'bishop') && others(opposite(color)).length === 0) {
+    return false;
+  }
+  return true;
+}
+
+/** End the game without a move (resignation, flag fall). */
+function endGame(state: GameState, status: GameStatus, winner: Color | null): GameState {
+  return pushEvents({ ...state, status, winner }, [{ type: 'gameOver', status, winner }]);
+}
 
 // ───────────────────────────── SAN ─────────────────────────────
 
@@ -181,6 +203,14 @@ export function gameReducer(state: GameState, action: MoveAction): GameState {
   switch (action.type) {
     case 'reset':
       return createGameState(standardBoard(), action.ruleset ?? state.ruleset, state.nextSeq);
+
+    case 'resign':
+    case 'timeout': {
+      if (isGameOver(state)) return pushEvents(state, [{ type: 'rejected', action, reason: 'Game is over' }]);
+      const opponent = opposite(action.color);
+      if (action.type === 'resign') return endGame(state, 'resigned', opponent);
+      return endGame(state, 'timeout', canPossiblyMate(state.board, opponent) ? opponent : null);
+    }
 
     case 'move': {
       const reject = (reason: string) => pushEvents(state, [{ type: 'rejected', action, reason }]);

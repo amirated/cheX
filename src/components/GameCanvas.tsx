@@ -1,6 +1,6 @@
 import { Application, extend, useApplication } from '@pixi/react';
 import { Container, Graphics, Text } from 'pixi.js';
-import { useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { HighlightModel } from '../render/board';
 import type { BoardState, Coord } from '../types/game';
 import { BoardView } from './BoardView';
@@ -29,8 +29,16 @@ interface Props {
 const DPR = Math.min(window.devicePixelRatio || 1, 3);
 
 export function GameCanvas({ board, size, highlights, onSquare, flipped }: Props) {
+  // @pixi/react's first render awaits WebGL init, then commits the children it started
+  // with — overwriting any newer props rendered meanwhile (e.g. the room state that
+  // arrived while the canvas was initialising). Re-render once init completes so the
+  // scene always reflects current props.
+  const [, setInitialised] = useState(false);
+  const onInit = useCallback(() => setInitialised(true), []);
+
   return (
     <Application
+      onInit={onInit}
       width={size}
       height={size}
       resolution={DPR}

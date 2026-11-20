@@ -129,3 +129,60 @@ html, body, #root {
 }
 .ghost:disabled { opacity: .6; }
 .ghost:active { transform: scale(.97); }
+
+/* ── Board column + player bars ── */
+.board-column { display: flex; flex-direction: column; gap: 8px; }
+.player-bar {
+  height: 40px; /* + 8px gap = PLAYER_BAR_PX in App.tsx */
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 6px 0 10px;
+  background: var(--panel);
+  border-radius: 10px;
+  border: 1px solid transparent;
+  transition: border-color .15s, background-color .15s;
+}
+.player-bar.is-active { border-color: #4a4458; background: #252230; }
+.player-bar .swatch { width: 16px; height: 16px; }
+.player-name { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.player-status { color: var(--muted); font-weight: 500; }
+
+.clock {
+  font-variant-numeric: tabular-nums;
+  font-size: 20px; font-weight: 700; letter-spacing: .01em;
+  min-width: 86px; text-align: center;
+  padding: 3px 10px; border-radius: 8px;
+  background: #15131b; color: var(--muted);
+}
+.clock-running { background: var(--ink); color: #17151d; }
+.clock-low { color: #f1c75b; }
+.clock-running.clock-low { background: #f1c75b; color: #241d10; }
+.clock-critical { color: #ff8a80; }
+.clock-running.clock-critical { background: var(--danger); color: #fff; animation: clock-pulse 1s ease-in-out infinite; }
+.clock-flagged { background: var(--danger); color: #fff; font-size: 15px; }
+@keyframes clock-pulse { 50% { opacity: .78; } }
+@media (prefers-reduced-motion: reduce) { .clock-running.clock-critical { animation: none; } }
+
+/* ── Time-control picker ── */
+.online-bar-picker { flex-direction: column; align-items: stretch; gap: 8px; padding: 10px; }
+.tc-picker { display: flex; flex-direction: column; gap: 8px; }
+.tc-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.tc-option {
+  font: inherit; display: flex; flex-direction: column; align-items: center; gap: 1px;
+  padding: 8px 4px; border-radius: 10px;
+  border: 1px solid #3a3546; background: #17151d; color: var(--ink);
+  cursor: pointer; touch-action: manipulation;
+}
+.tc-option strong { font-size: 16px; font-variant-numeric: tabular-nums; }
+.tc-option span { font-size: 11px; color: var(--muted); }
+.tc-option:active { transform: scale(.97); }
+.tc-option:disabled { opacity: .5; }
+.tc-custom { display: flex; gap: 8px; align-items: flex-end; }
+.tc-custom label { display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: var(--muted); flex: 1; }
+.tc-custom input {
+  font: inherit; font-size: 16px; /* ≥16px stops iOS zooming on focus */
+  width: 100%; min-height: 38px; padding: 0 8px;
+  border-radius: 8px; border: 1px solid #3a3546; background: #17151d; color: var(--ink);
+}
+.tc-footer { display: flex; gap: 6px; justify-content: flex-end; }
+.reset.danger { background: var(--danger); color: #fff; }
+.status-timeout, .status-resigned { background: #4a2420; color: #ffb4a8; }

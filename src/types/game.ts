@@ -134,7 +134,11 @@ export type MoveAction =
       /** Phase 2: server validates this matches the socket's seat. */
       color?: Color;
     }
-  | { type: 'reset'; ruleset?: Ruleset };
+  | { type: 'reset'; ruleset?: Ruleset }
+  /** Concede. Online, the server fills `color` from the player's seat. */
+  | { type: 'resign'; color: Color }
+  /** `color`'s clock ran out. Issued only by the authority that owns the clock (the server). */
+  | { type: 'timeout'; color: Color };
 
 // ───────────────────────────── events (authority → clients) ─────────────────────────────
 
@@ -173,7 +177,11 @@ export interface Ruleset {
 
 // ───────────────────────────── top-level state ─────────────────────────────
 
-export type GameStatus = 'inProgress' | 'check' | 'checkmate' | 'stalemate' | 'draw';
+/**
+ * 'timeout' with winner = null means the flagged side's opponent had no way to
+ * checkmate, which is a draw under the standard rule.
+ */
+export type GameStatus = 'inProgress' | 'check' | 'checkmate' | 'stalemate' | 'draw' | 'timeout' | 'resigned';
 
 export interface GameState {
   /** Bump when the schema changes incompatibly (client/server handshake). */

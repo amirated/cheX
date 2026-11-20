@@ -1,5 +1,5 @@
 import { Rectangle, TextStyle, type FederatedPointerEvent, type Graphics } from 'pixi.js';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { FILES, indexOf } from '../engine';
 import { drawBoard, drawHighlights, isLightSquare, pixelToCoord, type HighlightModel, type Orientation } from '../render/board';
 import { THEME } from '../render/theme';
@@ -30,14 +30,17 @@ export function BoardView({ board, size, highlights, onSquare, flipped = false }
   const drawHl = useCallback((g: Graphics) => drawHighlights(g, highlights, orient), [highlights, orient]);
   const hitArea = useMemo(() => new Rectangle(0, 0, size, size), [size]);
 
-  const onDown = useCallback(
-    (e: FederatedPointerEvent) => {
-      const p = e.getLocalPosition(e.currentTarget);
-      const c = pixelToCoord(p.x, p.y, orient);
-      if (c) onSquare(c);
-    },
-    [orient, onSquare],
-  );
+  // Pixi keeps the first pointer handler it was given, so a handler closing over props
+  // can go stale (e.g. still thinking it isn't your turn after joining an online room).
+  // Register one stable handler that always reads the latest props through a ref.
+  const latest = useRef({ orient, onSquare });
+  latest.current = { orient, onSquare };
+  const onDown = useCallback((e: FederatedPointerEvent) => {
+    const { orient: o, onSquare: cb } = latest.current;
+    const p = e.getLocalPosition(e.currentTarget);
+    const c = pixelToCoord(p.x, p.y, o);
+    if (c) cb(c);
+  }, []);
 
   // Coordinate labels: files on the bottom row, ranks on the left column.
   const labels = useMemo(() => {

@@ -1,4 +1,5 @@
 import { createGameState, gameReducer } from '../engine';
+import type { ClockView } from '../types/clock';
 import type { Color, GameEvent, GameState, MoveAction } from '../types/game';
 
 export interface SeatPresence {
@@ -36,6 +37,9 @@ export interface GameTransport {
   subscribe(listener: (state: GameState, newEvents: GameEvent[]) => void): () => void;
   getMeta(): TransportMeta;
   subscribeMeta(listener: () => void): () => void;
+  /** Latest authoritative clock, or null for untimed / local games. */
+  getClock(): ClockView | null;
+  subscribeClock(listener: () => void): () => void;
 }
 
 /** True when this client may move pieces of `color`. */
@@ -75,4 +79,7 @@ export class LocalTransport implements GameTransport {
 
   getMeta = (): TransportMeta => LOCAL_META;
   subscribeMeta = (): (() => void) => () => {};
+  // Local pass-and-play is untimed.
+  getClock = (): ClockView | null => null;
+  subscribeClock = (): (() => void) => () => {};
 }
