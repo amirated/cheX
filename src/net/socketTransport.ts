@@ -48,11 +48,31 @@ function readToken(roomId: string): string | null {
   }
 }
 
-function writeToken(roomId: string, token: string) {
+export function writeToken(roomId: string, token: string) {
   try {
     localStorage.setItem(tokenKey(roomId), token);
   } catch {
     /* private mode etc. — reconnect just won't reclaim the seat */
+  }
+}
+
+const matchedKey = (roomId: string) => `chex:matched:${roomId}`;
+
+/** Remember that this room came from quick match (no invite link; offer "New opponent"). */
+export function markMatched(roomId: string) {
+  try {
+    localStorage.setItem(matchedKey(roomId), '1');
+  } catch {
+    /* cosmetic only */
+  }
+}
+
+export function isMatched(roomId: string | null): boolean {
+  if (!roomId) return false;
+  try {
+    return localStorage.getItem(matchedKey(roomId)) === '1';
+  } catch {
+    return false;
   }
 }
 

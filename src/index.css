@@ -218,6 +218,10 @@ html, body, #root {
 .dot-on { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
 .dot-wait { background: var(--accent); }
 .dot-off { background: var(--danger); }
+.dot-pulse { animation: dot-pulse 1.2s ease-in-out infinite; }
+@keyframes dot-pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .dot-pulse { animation: none; } }
+.online-bar .reset { padding-left: 14px; padding-right: 14px; white-space: nowrap; }
 
 /* ── Player bars + clocks ── */
 .player-bar {

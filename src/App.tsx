@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { GameCanvas } from './components/GameCanvas';
 import { Hud } from './components/Hud';
 import { OnlineBar } from './components/OnlineBar';
@@ -9,7 +9,8 @@ import { THEMES } from './render/theme';
 import { useBoardSize } from './hooks/useBoardSize';
 import { useChessGame } from './hooks/useChessGame';
 import { useClock } from './hooks/useClock';
-import { createOnlineRoom, SERVER_URL, SocketTransport } from './net/socketTransport';
+import { findMatch, type MatchSearch } from './net/matchmaking';
+import { createOnlineRoom, isMatched, SERVER_URL, SocketTransport } from './net/socketTransport';
 import { LocalTransport, type GameTransport } from './net/transport';
 import type { TimeControl } from './types/clock';
 import type { Color } from './types/game';
@@ -22,6 +23,17 @@ function createTransport(): GameTransport {
 }
 const transport = createTransport();
 
+/** `?quick=180000+2000` (or `?quick=none`) starts a quick-match search on load ("New opponent"). */
+function quickParam(): TimeControl | null | undefined {
+  const q = new URLSearchParams(location.search).get('quick');
+  if (q === null) return undefined;
+  const [initial, inc] = q.split(' ').join('+').split('+').map(Number);
+  return Number.isFinite(initial) && initial > 0 ? { initialMs: initial, incrementMs: Number.isFinite(inc) ? inc : 0 } : null;
+}
+const initialQuick = quickParam();
+if (initialQuick !== undefined) history.replaceState(null, '', location.pathname);
+let quickStarted = false;
+
 /** Height of one player bar incl. its gap (keep in sync with .player-bar in index.css). */
 const PLAYER_BAR_PX = 48;
 
@@ -32,10 +44,45 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [searching, setSearching] = useState<{ since: number; timeControl: TimeControl | null } | null>(null);
+  const search = useRef<MatchSearch | null>(null);
 
   const online = meta.mode === 'online';
   const stageRef = useRef<HTMLDivElement>(null);
   const size = useBoardSize(stageRef, 640, online ? PLAYER_BAR_PX * 2 : 0);
+
+  const quickMatch = (tc: TimeControl | null) => {
+    if (meta.mode === 'online') {
+      // From a finished matched game: go back to the lobby and search again.
+      location.search = `?quick=${tc ? `${tc.initialMs}+${tc.incrementMs}` : 'none'}`;
+      return;
+    }
+    search.current?.cancel();
+    setCreateError(null);
+    setSearching({ since: Date.now(), timeControl: tc });
+    search.current = findMatch(SERVER_URL, tc, {
+      onFound: (m) => {
+        location.search = `?room=${m.roomId}`; // token is already saved; the room page claims the seat
+      },
+      onError: (message) => setCreateError(message),
+    });
+  };
+
+  const cancelSearch = () => {
+    search.current?.cancel();
+    search.current = null;
+    setSearching(null);
+    setCreateError(null);
+  };
+
+  // "New opponent" lands here with ?quick=…: start searching right away (once per page load).
+  useEffect(() => {
+    if (initialQuick !== undefined && !quickStarted && meta.mode === 'local') {
+      quickStarted = true;
+      quickMatch(initialQuick);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const playOnline = async (tc: TimeControl | null) => {
     setCreating(true);
@@ -99,10 +146,15 @@ export default function App() {
       {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
       <OnlineBar
         meta={meta}
-        onPlayOnline={playOnline}
+        onPlayFriend={playOnline}
+        onQuickMatch={quickMatch}
+        onCancelSearch={cancelSearch}
         creating={creating}
         createError={createError}
+        searching={searching}
         timeControl={meta.presence ? (clock?.timeControl ?? null) : undefined}
+        matched={isMatched(meta.roomId)}
+        over={over}
       />
       <div className="stage" ref={stageRef}>
         {size > 0 && (
