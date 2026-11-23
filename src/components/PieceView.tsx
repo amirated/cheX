@@ -3,7 +3,7 @@ import type { Container, Graphics, Ticker } from 'pixi.js';
 import { useCallback, useEffect, useRef } from 'react';
 import { drawPiece, drawShadow } from '../render/pieces/drawPiece';
 import { tileCenter, type Orientation } from '../render/board';
-import { THEME } from '../render/theme';
+import { ANIM, type PieceLook } from '../render/theme';
 import type { Coord, Piece } from '../types/game';
 
 interface Props {
@@ -11,6 +11,8 @@ interface Props {
   at: Coord;
   orient: Orientation;
   lifted: boolean;
+  look: PieceLook;
+  shadow: { color: number; alpha: number };
 }
 
 const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
@@ -20,7 +22,7 @@ const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t 
  * (slide between tiles, simulated Z-lift, shadow offset) is done by mutating
  * transforms inside the Pixi ticker — no React re-renders per frame.
  */
-export function PieceView({ piece, at, orient, lifted }: Props) {
+export function PieceView({ piece, at, orient, lifted, look, shadow: shadowStyle }: Props) {
   const tile = orient.tile;
   const root = useRef<Container>(null);
   const body = useRef<Container>(null);
@@ -54,8 +56,8 @@ export function PieceView({ piece, at, orient, lifted }: Props) {
     Object.assign(a, { fromX: a.x, fromY: a.y, toX: target.x, toY: target.y, t: 0 });
   }, [target.x, target.y, tile, orient.flipped]);
 
-  const drawBody = useCallback((g: Graphics) => drawPiece(g, piece.kind, piece.color, pieceSize), [piece.kind, piece.color, pieceSize]);
-  const drawShadowCb = useCallback((g: Graphics) => drawShadow(g, pieceSize), [pieceSize]);
+  const drawBody = useCallback((g: Graphics) => drawPiece(g, piece.kind, look, pieceSize), [piece.kind, look, pieceSize]);
+  const drawShadowCb = useCallback((g: Graphics) => drawShadow(g, pieceSize, shadowStyle), [pieceSize, shadowStyle]);
 
   const liftedRef = useRef(lifted);
   liftedRef.current = lifted;
@@ -73,12 +75,12 @@ export function PieceView({ piece, at, orient, lifted }: Props) {
 
     const dt = ticker.deltaMS;
     if (a.t < 1) {
-      a.t = Math.min(1, a.t + dt / THEME.anim.move);
+      a.t = Math.min(1, a.t + dt / ANIM.move);
       const e = easeInOut(a.t);
       a.x = a.fromX + (a.toX - a.fromX) * e;
       a.y = a.fromY + (a.toY - a.fromY) * e;
     }
-    const step = dt / THEME.anim.lift;
+    const step = dt / ANIM.lift;
     a.lift = want > a.lift ? Math.min(want, a.lift + step) : Math.max(want, a.lift - step);
 
     // a hop arc while travelling, so moving pieces read as "picked up"

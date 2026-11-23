@@ -1,6 +1,6 @@
 import type { Graphics } from 'pixi.js';
 import type { BoardState, Coord } from '../types/game';
-import { THEME } from './theme';
+import type { Theme } from './theme';
 
 /** How the board maps onto the screen. `flipped` puts Black at the bottom. */
 export interface Orientation {
@@ -32,10 +32,10 @@ export function pixelToCoord(x: number, y: number, o: Orientation): Coord | null
 export const isLightSquare = (c: Coord) => (c.file + c.rank) % 2 === 1;
 
 /** Static checkerboard + tile modifiers. Redrawn only on resize or tile-modifier change. */
-export function drawBoard(g: Graphics, board: BoardState, orient: Orientation): void {
+export function drawBoard(g: Graphics, board: BoardState, orient: Orientation, theme: Theme): void {
   const tile = orient.tile;
   g.clear();
-  const { light, dark } = THEME.board;
+  const { light, dark, grid } = theme.board;
   // one fill call per color keeps the draw-call count minimal
   for (const [color, wantLight] of [
     [light, true],
@@ -49,6 +49,17 @@ export function drawBoard(g: Graphics, board: BoardState, orient: Orientation): 
       }
     }
     g.fill({ color });
+  }
+
+  // Neon grid: hairlines between tiles, a brighter outer edge.
+  if (grid) {
+    const w = board.width * tile;
+    const h = board.height * tile;
+    const hair = Math.max(1, tile * 0.02);
+    for (let i = 1; i < board.width; i++) g.moveTo(i * tile, 0).lineTo(i * tile, h);
+    for (let j = 1; j < board.height; j++) g.moveTo(0, j * tile).lineTo(w, j * tile);
+    g.stroke({ width: hair, color: grid.color, alpha: grid.alpha });
+    g.rect(hair, hair, w - hair * 2, h - hair * 2).stroke({ width: hair * 2, color: grid.color, alpha: Math.min(1, grid.alpha * 2) });
   }
 
   // Tile modifiers (none on a V1 board) — a procedural hint so future levels are visible immediately.
@@ -74,10 +85,10 @@ export interface HighlightModel {
 }
 
 /** Dynamic overlays. Cheap to redraw on every selection change. */
-export function drawHighlights(g: Graphics, m: HighlightModel, orient: Orientation): void {
+export function drawHighlights(g: Graphics, m: HighlightModel, orient: Orientation, theme: Theme): void {
   const tile = orient.tile;
   g.clear();
-  const H = THEME.highlight;
+  const H = theme.highlight;
 
   if (m.lastMove) {
     for (const c of [m.lastMove.from, m.lastMove.to]) {
@@ -97,7 +108,21 @@ export function drawHighlights(g: Graphics, m: HighlightModel, orient: Orientati
 
   if (m.selected) {
     const o = tileOrigin(m.selected, orient);
-    g.rect(o.x, o.y, tile, tile).fill({ color: H.selected.color, alpha: H.selected.alpha });
+    if (H.selected.mode === 'fill') {
+      g.rect(o.x, o.y, tile, tile).fill({ color: H.selected.color, alpha: H.selected.alpha });
+    } else {
+      // corner brackets: reads as "targeted" without hiding the piece
+      const w = Math.max(2, tile * 0.06);
+      const inset = w / 2 + tile * 0.03;
+      const len = tile * 0.3;
+      const [x0, y0, x1, y1] = [o.x + inset, o.y + inset, o.x + tile - inset, o.y + tile - inset];
+      g.moveTo(x0, y0 + len).lineTo(x0, y0).lineTo(x0 + len, y0);
+      g.moveTo(x1 - len, y0).lineTo(x1, y0).lineTo(x1, y0 + len);
+      g.moveTo(x1, y1 - len).lineTo(x1, y1).lineTo(x1 - len, y1);
+      g.moveTo(x0 + len, y1).lineTo(x0, y1).lineTo(x0, y1 - len);
+      g.stroke({ width: w, color: H.selected.color, alpha: H.selected.alpha, join: 'miter', cap: 'square' });
+      g.rect(o.x, o.y, tile, tile).fill({ color: H.selected.color, alpha: 0.1 });
+    }
   }
 
   for (const t of m.quietTargets) {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import type { Color, GameStatus } from '../types/game';
 
 const STATUS_LABEL: Record<GameStatus, string> = {
@@ -24,6 +24,8 @@ interface Props {
   onResign?: () => void;
   /** Online only: the colour this client plays; null = spectating. undefined = local game. */
   seat?: Color | null;
+  /** Trailing control (e.g. the settings button). */
+  extra?: ReactNode;
 }
 
 function headline(over: boolean, turn: Color, winner: Color | null, seat: Color | null | undefined): string {
@@ -57,7 +59,7 @@ function reason(status: GameStatus, winner: Color | null, turn: Color): string {
   }
 }
 
-export function Hud({ turn, status, winner, moveNumber, onReset, onResign, seat }: Props) {
+export function Hud({ turn, status, winner, moveNumber, onReset, onResign, seat, extra }: Props) {
   const over = OVER.has(status);
   const [confirming, setConfirming] = useState(false);
 
@@ -77,10 +79,13 @@ export function Hud({ turn, status, winner, moveNumber, onReset, onResign, seat 
         <span className={`swatch swatch-${over && winner ? winner : turn}`} />
         <div className="hud-text">
           <strong>{headline(over, turn, winner, seat)}</strong>
-          <span className="hud-sub">{over ? reason(status, winner, turn) : `Move ${moveNumber}`}</span>
+          <span className="hud-sub">
+            {over ? reason(status, winner, turn) : `Move ${moveNumber}${status === 'inProgress' ? ' · In progress' : ''}`}
+          </span>
         </div>
       </div>
-      <span className={`status status-${status}`}>{STATUS_LABEL[status]}</span>
+      {/* "In progress" lives in the sub-line; the pill is reserved for states that need attention. */}
+      {status !== 'inProgress' && <span className={`status status-${status}`}>{STATUS_LABEL[status]}</span>}
       {(seat === undefined || (seat !== null && over)) && (
         <button className="reset" onClick={onReset} type="button">
           {seat === undefined ? 'Reset Board' : 'Rematch'}
@@ -100,6 +105,7 @@ export function Hud({ turn, status, winner, moveNumber, onReset, onResign, seat 
           {confirming ? 'Confirm?' : 'Resign'}
         </button>
       )}
+      {extra}
     </header>
   );
 }
