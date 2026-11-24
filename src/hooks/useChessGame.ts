@@ -1,6 +1,8 @@
 import { useCallback, useMemo, useState, useSyncExternalStore } from 'react';
 import { findPiece, getPieceDef, isGameOver, legalMoves, pieceAt, sameCoord } from '../engine';
 import type { HighlightModel } from '../render/board';
+import { haptic } from '../feedback/haptics';
+import { playSound } from '../feedback/sound';
 import { controls, type GameTransport } from '../net/transport';
 import type { Coord, GameState } from '../types/game';
 
@@ -29,8 +31,19 @@ export function useChessGame(transport: GameTransport) {
         return;
       }
       const p = pieceAt(state.board, c);
-      if (p && p.color === state.turn && myTurn && !sameCoord(selected, c)) setSelected(c);
-      else setSelected(null);
+      if (p && p.color === state.turn && myTurn && !sameCoord(selected, c)) {
+        setSelected(c);
+        playSound('select');
+        haptic('select');
+      } else {
+        // A tap that can't do anything: an opponent's piece, or a square the selected piece can't reach.
+        const pointless = !isGameOver(state) && ((p && !myTurn) || (selected && !sameCoord(selected, c) && (!p || p.color !== state.turn)));
+        if (pointless) {
+          playSound('illegal');
+          haptic('illegal');
+        }
+        setSelected(null);
+      }
     },
     [selectedMoves, selected, state, transport, myTurn],
   );

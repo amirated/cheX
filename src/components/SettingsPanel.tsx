@@ -1,4 +1,6 @@
-import { setPreferences, usePreferences } from '../prefs/preferences';
+import { haptic } from '../feedback/haptics';
+import { playSound, unlockAudio } from '../feedback/sound';
+import { setPreferences, usePreferences, type Preferences } from '../prefs/preferences';
 import { THEMES, type PieceStyle, type ThemeId } from '../render/theme';
 
 const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
@@ -77,12 +79,45 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
         </div>
       </div>
 
+      <div className="settings-group settings-toggles">
+        <Toggle label="Sound" k="sound" on={prefs.sound} preview={() => playSound('capture')} />
+        <Toggle label="Haptics" k="haptics" on={prefs.haptics} preview={() => haptic('capture')} />
+      </div>
+
       <div className="settings-footer">
         <button type="button" className="ghost" onClick={onClose}>
           Done
         </button>
       </div>
     </section>
+  );
+}
+
+function Toggle({ label, k, on, preview }: { label: string; k: keyof Pick<Preferences, 'sound' | 'haptics'>; on: boolean; preview: () => void }) {
+  return (
+    <div className="settings-toggle">
+      <span className="settings-label">{label}</span>
+      <div className="settings-segment" role="radiogroup" aria-label={label}>
+        {[true, false].map((v) => (
+          <button
+            key={String(v)}
+            type="button"
+            role="radio"
+            aria-checked={on === v}
+            className={on === v ? 'is-on' : ''}
+            onClick={() => {
+              setPreferences({ [k]: v });
+              if (v) {
+                unlockAudio();
+                preview(); // a sample, so the switch is felt/heard immediately
+              }
+            }}
+          >
+            {v ? 'On' : 'Off'}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
