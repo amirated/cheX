@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { BoardFx } from './components/BoardFx';
 import { GameCanvas } from './components/GameCanvas';
+import { GameOverOverlay } from './components/GameOverOverlay';
+import { useGameFeedback } from './feedback/useGameFeedback';
 import { Hud } from './components/Hud';
 import { OnlineBar } from './components/OnlineBar';
 import { PlayerBar } from './components/PlayerBar';
@@ -38,8 +41,18 @@ let quickStarted = false;
 const PLAYER_BAR_PX = 48;
 
 export default function App() {
-  const { state, meta, highlights, onSquare, reset, resign, sanLog } = useChessGame(transport);
+  const { state, meta, myTurn, highlights, onSquare, reset, resign, sanLog } = useChessGame(transport);
   const clock = useClock(transport);
+  const fx = useGameFeedback(state, meta, clock);
+  const [dismissed, setDismissed] = useState<number | null>(null);
+  const frameRef = useRef<HTMLDivElement>(null);
+
+  // Checkmate lands with a jolt (Web Animations, so the canvas isn't remounted).
+  useEffect(() => {
+    if (!fx.shake || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const k = [0, -9, 8, -6, 5, -3, 2, 0].map((x, i) => ({ transform: `translate(${x}px, ${i % 2 ? 2 : -2}px)` }));
+    frameRef.current?.animate(k, { duration: 520, easing: 'ease-out', delay: 180 });
+  }, [fx.shake]);
   const prefs = usePreferences();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -107,6 +120,15 @@ export default function App() {
   const bottom: Color = meta.seat ?? 'white';
   const top: Color = bottom === 'white' ? 'black' : 'white';
   const over = ['checkmate', 'stalemate', 'draw', 'timeout', 'resigned'].includes(state.status);
+  const matched = isMatched(meta.roomId);
+  const showOver = fx.over && fx.over.seq !== dismissed ? fx.over : null;
+  const canRematch = !online || !!meta.seat;
+  const frameClass = [
+    'board-frame',
+    online && meta.seat && myTurn && !over ? 'is-your-turn' : '',
+    state.status === 'check' ? 'is-check' : '',
+    state.status === 'checkmate' ? 'is-mate' : '',
+  ].filter(Boolean).join(' ');
 
   const bar = (color: Color) => {
     const seat = meta.presence?.[color];
@@ -153,14 +175,14 @@ export default function App() {
         createError={createError}
         searching={searching}
         timeControl={meta.presence ? (clock?.timeControl ?? null) : undefined}
-        matched={isMatched(meta.roomId)}
+        matched={matched}
         over={over}
       />
       <div className="stage" ref={stageRef}>
         {size > 0 && (
           <div className="board-column" style={{ width: size }}>
             {online && bar(top)}
-            <div className="board-frame" style={{ width: size, height: size }}>
+            <div ref={frameRef} className={frameClass} style={{ width: size, height: size }}>
               <GameCanvas
                 board={state.board}
                 size={size}
@@ -170,6 +192,25 @@ export default function App() {
                 theme={THEMES[prefs.theme]}
                 pieceStyle={prefs.pieceStyle}
               />
+              <BoardFx
+                size={size}
+                files={state.board.width}
+                ranks={state.board.height}
+                flipped={meta.seat === 'black'}
+                bursts={fx.bursts}
+                checkSquare={highlights.checkSquare}
+                mate={state.status === 'checkmate'}
+              />
+              {showOver && (
+                <GameOverOverlay
+                  key={showOver.seq}
+                  info={showOver}
+                  seat={online ? meta.seat : undefined}
+                  onRematch={canRematch ? reset : undefined}
+                  onNewOpponent={matched ? () => quickMatch(clock?.timeControl ?? null) : undefined}
+                  onDismiss={() => setDismissed(showOver.seq)}
+                />
+              )}
             </div>
             {online && bar(bottom)}
           </div>

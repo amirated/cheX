@@ -85,7 +85,7 @@ export function Hud({ turn, status, winner, moveNumber, onReset, onResign, seat,
         </div>
       </div>
       {/* "In progress" lives in the sub-line; the pill is reserved for states that need attention. */}
-      {status !== 'inProgress' && <span className={`status status-${status}`}>{STATUS_LABEL[status]}</span>}
+      {status !== 'inProgress' && !over && <span className={`status status-${status}`}>{STATUS_LABEL[status]}</span>}
       {(seat === undefined || (seat !== null && over)) && (
         <button className="reset" onClick={onReset} type="button">
           {seat === undefined ? 'Reset Board' : 'Rematch'}
