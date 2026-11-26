@@ -16,7 +16,8 @@ import { createEmptyBoard, indexOf, opposite, sameCoord, squareName } from './bo
 import { applyEffects } from './effects';
 import { legalMoves, sideInCheck } from './legal';
 import { getPieceDef } from './pieces/registry';
-import { activeModifiersFor, isModified } from './rules/modifiers';
+import { modOfMove, withUse } from './rules/charges';
+import { activeModifiersFor, enhancementsOf } from './rules/modifiers';
 
 export const STANDARD_RULESET: Ruleset = { name: 'standard', modifiers: [] };
 
@@ -112,7 +113,7 @@ export function canPossiblyMate(board: BoardState, color: Color, modifiers: Acti
   if (
     mine.length === 1 &&
     (mine[0].kind === 'knight' || mine[0].kind === 'bishop') &&
-    !isModified(modifiers, mine[0]) &&
+    enhancementsOf(modifiers, mine[0], null).length === 0 &&
     others(opposite(color)).length === 0
   ) {
     return false;
@@ -179,8 +180,17 @@ export function applyMove(state: GameState, move: Move, legalBefore: Move[] = le
   }
 
   const resetClock = mover.kind === 'pawn' || removed.length > 0;
+  // A mod move spends one of the piece's charges and starts its cooldown.
+  const usedMod = modOfMove(move);
+  const ruleset = usedMod
+    ? {
+        ...state.ruleset,
+        modifiers: state.ruleset.modifiers.map((m) => (m.id === usedMod ? withUse(m, move.pieceId, state.ply) : m)),
+      }
+    : state.ruleset;
   let next: GameState = {
     ...state,
+    ruleset,
     board,
     turn: opposite(state.turn),
     enPassant: move.enPassantTarget,

@@ -4,6 +4,8 @@ import type { TransportMeta } from '../net/transport';
 import type { Color, Coord, GameEvent, GameState, GameStatus } from '../types/game';
 import { haptic } from './haptics';
 import { playSound, type SoundName } from './sound';
+import { modOfMove } from '../engine/rules/charges';
+import { modInfo } from '../variants/catalog';
 
 /** Pieces slide for ~190 ms (ANIM.move): land the sound with the piece, not before it. */
 const LANDING_MS = 150;
@@ -14,6 +16,8 @@ export interface Burst {
   at: Coord;
   /** Colour of the captured piece (shards take its colour). */
   color: Color;
+  /** Override colour (a mod move bursts in its cartridge colour). */
+  tint?: string;
 }
 
 export interface GameOverInfo {
@@ -72,8 +76,11 @@ export function useGameFeedback(state: GameState, meta: TransportMeta, clock: Cl
     const promoted = fresh.some((e) => e.type === 'promoted');
     const ended = fresh.find((e): e is Extract<GameEvent, { type: 'gameOver' }> => e.type === 'gameOver');
 
-    if (captured.length) {
-      const add = captured.map((c) => ({ id: ++burstId.current, at: c.at, color: c.piece.color }));
+    const usedMod = moved ? modOfMove(moved.move) : null;
+    const modTint = usedMod ? modInfo(usedMod)?.shell : undefined;
+    if (captured.length || modTint) {
+      const add: Burst[] = captured.map((c) => ({ id: ++burstId.current, at: c.at, color: c.piece.color, tint: modTint }));
+      if (moved && modTint && !captured.length) add.push({ id: ++burstId.current, at: moved.move.to, color: moved.color, tint: modTint });
       setBursts((b) => [...b, ...add]);
       const ids = new Set(add.map((a) => a.id));
       later(() => setBursts((b) => b.filter((x) => !ids.has(x.id))), 1100);
@@ -98,6 +105,7 @@ export function useGameFeedback(state: GameState, meta: TransportMeta, clock: Cl
       const theirs = seat != null && moved.color !== seat;
       const castle = moved.move.flags.some((f) => f === 'castleKingside' || f === 'castleQueenside');
       const land: SoundName = captured.length ? 'capture' : castle ? 'castle' : theirs ? 'opponentMove' : 'move';
+      if (usedMod) playSound('enhance'); // the charge fires as the piece takes off
       later(() => {
         playSound(land);
         if (promoted) playSound('promote');

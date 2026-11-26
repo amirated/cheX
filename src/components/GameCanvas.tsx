@@ -3,7 +3,8 @@ import { Container, Graphics, Text } from 'pixi.js';
 import { useCallback, useEffect, useState } from 'react';
 import type { HighlightModel } from '../render/board';
 import type { PieceStyle, Theme } from '../render/theme';
-import type { BoardState, Coord, PieceKind } from '../types/game';
+import type { BoardState, Coord } from '../types/game';
+import type { PipInfo } from './PieceView';
 import { BoardView } from './BoardView';
 
 // Register only the Pixi classes we use as JSX (<pixiContainer/>, <pixiGraphics/>, <pixiText/>).
@@ -26,8 +27,8 @@ interface Props {
   flipped?: boolean;
   theme: Theme;
   pieceStyle: PieceStyle;
-  /** Piece kinds changed by plugged-in mods → marker colour. */
-  pips?: Partial<Record<PieceKind, number>>;
+  /** Mod charges per piece id (drawn as chips on the piece). */
+  pips?: Record<string, PipInfo>;
 }
 
 /** Cap DPR at 3: beyond that mobile GPUs pay a lot of fill-rate for no visible gain. */

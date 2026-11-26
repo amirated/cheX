@@ -23,7 +23,12 @@ import { findMatch, type MatchSearch } from './net/matchmaking';
 import { createOnlineRoom, isMatched, SERVER_URL, SocketTransport } from './net/socketTransport';
 import { LocalTransport, type GameTransport } from './net/transport';
 import type { TimeControl } from './types/clock';
-import type { Color, PieceKind } from './types/game';
+import type { Color } from './types/game';
+import type { PipInfo } from './components/PieceView';
+import { ModStatusLine } from './components/mods/ModStatusLine';
+import { pieceModStatus } from './engine/rules/modifiers';
+import { levelOf } from './engine/rules/charges';
+import { playerLevel } from './variants/progression';
 
 /** `?room=CODE` → online game against the Rust server; otherwise local pass-and-play.
  *  Created once at module scope so React StrictMode's double-mount can't open two sockets. */
@@ -32,7 +37,7 @@ function createTransport(): GameTransport {
   // A local game starts with whatever cartridges are in this device's mod bay.
   return room
     ? new SocketTransport(SERVER_URL, room.toUpperCase())
-    : new LocalTransport(createGameState(standardBoard(), rulesetFor(getLoadout())));
+    : new LocalTransport(createGameState(standardBoard(), rulesetFor(getLoadout(), playerLevel)));
 }
 const transport = createTransport();
 
@@ -87,14 +92,17 @@ export default function App() {
 
   // Mods of the game on screen (an online room's are fixed when the room is made).
   const activeMods = modsOf(state.ruleset);
+  // Charges left on every enhanced piece (chips on the piece) — generic for any piece mod.
   const pips = useMemo(() => {
-    const out: Partial<Record<PieceKind, number>> = {};
-    for (const id of activeMods) {
-      const m = modInfo(id);
-      if (m) out[m.piece] = parseInt(m.shell.slice(1), 16);
+    const out: Record<string, PipInfo> = {};
+    if (!state.ruleset.modifiers.length) return out;
+    for (const piece of Object.values(state.board.pieces)) {
+      const st = pieceModStatus(state, piece)[0];
+      const info = st && modInfo(st.modId);
+      if (st && info) out[piece.id] = { color: parseInt(info.shell.slice(1), 16), level: st.level, charges: st.charges, cooling: st.cooling };
     }
     return out;
-  }, [activeMods.join('+')]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [state]);
 
   /** Plug a cartridge in or eject it. Locally that restarts the game with the new rules. */
   const toggleMod = (id: string) => {
@@ -103,7 +111,7 @@ export default function App() {
     if (!online) {
       const midGame = state.ply > 0 && !['checkmate', 'stalemate', 'draw', 'timeout', 'resigned'].includes(state.status);
       if (midGame && !window.confirm('Changing mods starts a new game. Continue?')) return;
-      transport.send({ type: 'reset', ruleset: rulesetFor(next) });
+      transport.send({ type: 'reset', ruleset: rulesetFor(next, playerLevel) });
     }
     setLoadout(next);
     setFreshMod(plugging ? id : null);
@@ -160,9 +168,12 @@ export default function App() {
   // Pair plies into "1. e4 e5" and show the most recent few.
   const moves = useMemo(() => {
     const rows: string[] = [];
-    for (let i = 0; i < sanLog.length; i += 2) rows.push(`${i / 2 + 1}. ${sanLog[i]}${sanLog[i + 1] ? ' ' + sanLog[i + 1] : ''}`);
+    // ◆ marks a move that used a mod charge.
+    const mark = (i: number) => (state.history[i]?.flags.some((f) => f.startsWith('mod:')) ? '◆' : '');
+    const san = (i: number) => `${sanLog[i]}${mark(i)}`;
+    for (let i = 0; i < sanLog.length; i += 2) rows.push(`${i / 2 + 1}. ${san(i)}${sanLog[i + 1] ? ' ' + san(i + 1) : ''}`);
     return rows.slice(-4);
-  }, [sanLog]);
+  }, [sanLog, state.history]);
 
   // You at the bottom; spectators see White at the bottom.
   const bottom: Color = meta.seat ?? 'white';
@@ -262,6 +273,11 @@ export default function App() {
               mods={online ? activeMods : loadout}
               editable={!online}
               fresh={freshMod}
+              levels={
+                online
+                  ? Object.fromEntries(state.ruleset.modifiers.map((m) => [m.id, levelOf(m)]))
+                  : Object.fromEntries(loadout.map((id) => [id, playerLevel(id)]))
+              }
               onOpenLibrary={() => {
                 setLibraryOpen(true);
                 setSettingsOpen(false);
@@ -303,6 +319,7 @@ export default function App() {
           </div>
         )}
       </div>
+      <ModStatusLine state={state} selected={highlights.selected} />
       <footer className="movelog">{moves.length ? moves.join('   ') : 'Tap a piece to begin'}</footer>
     </main>
   );

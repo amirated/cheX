@@ -10,13 +10,15 @@ interface Props {
   onEject: (id: string) => void;
   /** Mod id that was just inserted (plays the insert animation once). */
   fresh: string | null;
+  /** Level each mod runs at in this game. */
+  levels: Record<string, number>;
 }
 
 /**
  * The console's cartridge bay, mounted on the board's top edge. One slot per mod;
  * a combo game simply shows several cartridges side by side.
  */
-export function ModBay({ mods, editable, onOpenLibrary, onEject, fresh }: Props) {
+export function ModBay({ mods, editable, onOpenLibrary, onEject, fresh, levels }: Props) {
   const slots = Array.from({ length: MAX_SLOTS }, (_, i) => mods[i] ?? null);
   const loaded = mods.length;
   return (
@@ -55,7 +57,7 @@ export function ModBay({ mods, editable, onOpenLibrary, onEject, fresh }: Props)
                 aria-label={editable ? `Eject ${mod.name}` : `${mod.name} is active`}
                 title={editable ? `Eject ${mod.name}` : mod.name}
               >
-                <BayCartridge mod={mod} />
+                <BayCartridge mod={mod} level={levels[mod.id] ?? 1} />
                 <span className="bay-port" />
               </button>
             );

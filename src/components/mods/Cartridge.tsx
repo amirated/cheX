@@ -98,7 +98,7 @@ export function Cartridge({ mod, plugged = false, className = '', style }: Props
  * The part of a cartridge you see sticking out of a bay slot: a wide shell top with
  * grip ridges, the label strip and a status LED. The edge connector is inside the port.
  */
-export function BayCartridge({ mod }: { mod: ModInfo }) {
+export function BayCartridge({ mod, level }: { mod: ModInfo; level: number }) {
   const id = useId().replace(/:/g, '');
   return (
     <svg className="bay-cart" viewBox="0 0 160 52" style={{ ['--shell' as string]: mod.shell }} aria-hidden>
@@ -135,8 +135,12 @@ export function BayCartridge({ mod }: { mod: ModInfo }) {
         ))}
         <circle r="1.5" fill="#fff" />
       </g>
-      <rect x="70" y="30" width="34" height="2" fill="var(--shell)" opacity=".7" />
-      <rect x="70" y="35" width="22" height="2" fill="var(--shell)" opacity=".4" />
+      <rect x="70" y="29" width="26" height="11" rx="2" fill="var(--shell)" />
+      <text x="83" y="37.5" className="bay-cart-level" textAnchor="middle">
+        LV{level}
+      </text>
+      <rect x="100" y="30" width="18" height="2" fill="var(--shell)" opacity=".6" />
+      <rect x="100" y="35" width="12" height="2" fill="var(--shell)" opacity=".35" />
       <circle className="cart-led" cx="153" cy="4.5" r="2" />
     </svg>
   );

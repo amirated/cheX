@@ -62,7 +62,7 @@ export function registerStandardSpecials(): void {
     id: 'castling',
     generate(ctx, piece, from) {
       const { board } = ctx;
-      if (piece.hasMoved || isInCheck(board, piece.color, ctx.enPassant, ctx.modifiers)) return [];
+      if (piece.hasMoved || isInCheck(board, piece.color, ctx.enPassant, ctx.modifiers, ctx.turn, ctx.ply)) return [];
       const out: Move[] = [];
 
       for (const dir of [1, -1] as const) {

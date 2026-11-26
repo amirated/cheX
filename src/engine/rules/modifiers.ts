@@ -1,5 +1,5 @@
 import type { ActiveRuleModifier, BoardEffect, Color, GameState, Move, Piece, PieceKind } from '../../types/game';
-import { getPieceDef } from '../pieces/registry';
+import { chargesLeft, COOLDOWN_PLIES, isAvailable, levelOf, usesOf } from './charges';
 import type { MovementRule } from '../pieces/types';
 
 /**
@@ -41,21 +41,23 @@ export function activeModifiersFor(state: GameState, color: Color) {
 
 const applies = (m: ActiveRuleModifier, color: Color) => m.owner === null || m.owner === color;
 
-/** A piece's movement in this game: its definition plus whatever active mods add. */
-export function movementOf(modifiers: ActiveRuleModifier[], piece: Piece): MovementRule[] {
-  const base = getPieceDef(piece.kind).movement;
-  let extra: MovementRule[] | null = null;
+/**
+ * Mod enhancements a piece can use, as [mod id, extra rules]. With `atPly` the piece must
+ * also be off cooldown on that ply; `null` checks charges only.
+ */
+export function enhancementsOf(
+  modifiers: ActiveRuleModifier[],
+  piece: Piece,
+  atPly: number | null,
+): [string, MovementRule[]][] {
+  const out: [string, MovementRule[]][] = [];
   for (const m of modifiers) {
     if (!applies(m, piece.color)) continue;
-    const add = registry.get(m.id)?.extraMovement?.(piece.kind, piece.color, m);
-    if (add?.length) extra = [...(extra ?? []), ...add];
+    const rules = registry.get(m.id)?.extraMovement?.(piece.kind, piece.color, m) ?? [];
+    if (rules.length && isAvailable(m, piece.id, atPly)) out.push([m.id, rules]);
   }
-  return extra ? [...base, ...extra] : base;
+  return out;
 }
-
-/** Does any active mod change how this piece moves? */
-export const isModified = (modifiers: ActiveRuleModifier[], piece: Piece): boolean =>
-  movementOf(modifiers, piece) !== getPieceDef(piece.kind).movement;
 
 export function registerExampleModifiers(): void {
   // Inactive by default — add `{ id: 'noCastling', owner: null, data: {} }` to a Ruleset to try it.
@@ -66,4 +68,34 @@ export function registerExampleModifiers(): void {
     transformMoves: (moves) =>
       moves.filter((m) => !m.flags.includes('castleKingside') && !m.flags.includes('castleQueenside')),
   });
+}
+
+/** What a piece's mods look like right now (for the UI: pips, status line). */
+export interface PieceModStatus {
+  modId: string;
+  level: number;
+  charges: number;
+  /** Usable on its owner's next move. */
+  ready: boolean;
+  /** Cooling down (charges left, but not on the owner's next move). */
+  cooling: boolean;
+}
+
+export function pieceModStatus(state: GameState, piece: Piece): PieceModStatus[] {
+  const out: PieceModStatus[] = [];
+  const atPly = piece.color === state.turn ? state.ply : state.ply + 1;
+  for (const m of state.ruleset.modifiers) {
+    if (!applies(m, piece.color)) continue;
+    if (!registry.get(m.id)?.extraMovement?.(piece.kind, piece.color, m).length) continue;
+    const charges = chargesLeft(m, piece.id);
+    const ready = isAvailable(m, piece.id, atPly);
+    out.push({ modId: m.id, level: levelOf(m), charges, ready, cooling: charges > 0 && !ready });
+  }
+  return out;
+}
+
+/** Plies until a cooling piece is ready (0 when ready or spent). */
+export function pliesUntilReady(state: GameState, active: ActiveRuleModifier, pieceId: string): number {
+  const [, last] = usesOf(active, pieceId);
+  return last === null ? 0 : Math.max(0, last + COOLDOWN_PLIES - state.ply);
 }

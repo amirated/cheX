@@ -1,3 +1,4 @@
+import { DEFAULT_LEVEL, initialData } from '../engine/rules/charges';
 import type { PieceKind, Ruleset, Vec } from '../types/game';
 
 /**
@@ -9,6 +10,8 @@ export interface ModInfo {
   /** Cartridge code printed on the label. */
   code: string;
   name: string;
+  /** Short name of the move it grants, for the HUD ("Camel leap"). */
+  ability: string;
   tagline: string;
   description: string;
   rules: string[];
@@ -39,15 +42,16 @@ export const MODS: ModInfo[] = [
     id: 'knightCamel',
     code: 'NC-01',
     name: 'Camel Knight',
+    ability: 'Camel leap',
     tagline: 'Knights grow a longer leg.',
     description:
       'Every knight keeps its usual L-shaped jump and gains a longer one: three squares in a straight line, then one to the side. It still jumps over anything in between.',
     rules: [
-      'Knights move as normal, or leap (3,1): three squares one way and one square at a right angle.',
-      'The camel leap jumps over pieces and can capture, just like a normal knight move.',
-      'Camel leaps give check, pin and fork exactly like ordinary moves.',
-      'Watch your king early: a knight on d4/f4 hits e1, and one on d5/f5 hits e8. Mate in two is possible if you sleep on it.',
-      'A king and a lone knight can still deliver mate here, so it is not an automatic draw.',
+      'Knights move as normal, or make a camel leap (3,1): three squares one way and one square at a right angle.',
+      'Each knight has as many camel leaps as your level: one at level 1, up to three at level 3. Normal knight moves are always free.',
+      'After a leap the knight cools down: it skips one of your turns before it can leap again.',
+      'The leap jumps over pieces and can capture. A knight that can leap on its next move threatens those squares, so it gives check and pins like any move. A spent or cooling knight only threatens normally.',
+      'Watch your king early: a ready knight on d4/f4 hits e1, and one on d5/f5 hits e8.',
       'Everything else is classic chess: castling, en passant, promotion and the 50-move rule.',
     ],
     piece: 'knight',
@@ -68,13 +72,14 @@ export const MAX_SLOTS = 3;
 export const modInfo = (id: string): ModInfo | undefined => MODS.find((m) => m.id === id);
 
 /**
- * Ruleset for a set of mods (global, both sides). Canonical: sorted, de-duplicated,
- * name = ids joined by "+" or "standard". Must match `Ruleset::with_mods` in cheX-BE.
+ * Ruleset for a set of mods (global, both sides), each at `levelOf(id)`. Canonical: sorted,
+ * de-duplicated, name = ids joined by "+" or "standard", data `{ level }`.
+ * Must match `Ruleset::with_levels` in cheX-BE.
  */
-export function rulesetFor(ids: string[]): Ruleset {
+export function rulesetFor(ids: string[], levelOf: (id: string) => number = () => DEFAULT_LEVEL): Ruleset {
   const sorted = [...new Set(ids)].sort();
   if (!sorted.length) return { name: 'standard', modifiers: [] };
-  return { name: sorted.join('+'), modifiers: sorted.map((id) => ({ id, owner: null, data: {} })) };
+  return { name: sorted.join('+'), modifiers: sorted.map((id) => ({ id, owner: null, data: initialData(levelOf(id)) })) };
 }
 
 export const modsOf = (ruleset: Ruleset): string[] => ruleset.modifiers.map((m) => m.id);

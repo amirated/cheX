@@ -13,8 +13,8 @@ interface Props {
   lifted: boolean;
   look: PieceLook;
   shadow: { color: number; alpha: number };
-  /** A plugged-in mod changes this piece: small glowing chip in the cartridge's colour. */
-  pip?: number | null;
+  /** A plugged-in mod enhances this piece: its charges, drawn as chips in the cartridge colour. */
+  pip?: PipInfo | null;
 }
 
 const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
@@ -24,6 +24,13 @@ const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t 
  * (slide between tiles, simulated Z-lift, shadow offset) is done by mutating
  * transforms inside the Pixi ticker — no React re-renders per frame.
  */
+export interface PipInfo {
+  color: number;
+  level: number;
+  charges: number;
+  cooling: boolean;
+}
+
 export function PieceView({ piece, at, orient, lifted, look, shadow: shadowStyle, pip = null }: Props) {
   const tile = orient.tile;
   const root = useRef<Container>(null);
@@ -62,13 +69,28 @@ export function PieceView({ piece, at, orient, lifted, look, shadow: shadowStyle
   const drawPip = useCallback(
     (g: Graphics) => {
       g.clear();
-      if (pip == null) return;
-      const r = pieceSize * 0.09;
-      const x = pieceSize * 0.34;
-      const y = -pieceSize * 0.36;
-      g.circle(x, y, r * 2.1).fill({ color: pip, alpha: 0.22 });
-      g.poly([x, y - r * 1.25, x + r * 1.25, y, x, y + r * 1.25, x - r * 1.25, y]).fill({ color: pip });
-      g.poly([x, y - r * 1.25, x + r * 1.25, y, x, y + r * 1.25, x - r * 1.25, y]).stroke({ width: Math.max(1, r * 0.35), color: 0x000000, alpha: 0.6 });
+      if (!pip) return;
+      // One diamond per charge the level allows: filled = left, hollow = spent.
+      // While cooling down the remaining charges glow dim.
+      const r = pieceSize * 0.075;
+      const gap = r * 2.3;
+      const y = -pieceSize * 0.4;
+      const x0 = pieceSize * 0.42 - (pip.level - 1) * gap;
+      const diamond = (x: number) => [x, y - r, x + r, y, x, y + r, x - r, y];
+      if (pip.charges > 0) {
+        g.roundRect(x0 - r * 1.6, y - r * 1.6, (pip.level - 1) * gap + r * 3.2, r * 3.2, r * 1.6).fill({
+          color: 0x000000,
+          alpha: 0.45,
+        });
+      }
+      for (let i = 0; i < pip.level; i++) {
+        const pts = diamond(x0 + i * gap);
+        if (i < pip.charges) {
+          g.poly(pts).fill({ color: pip.color, alpha: pip.cooling ? 0.35 : 1 });
+        } else {
+          g.poly(pts).stroke({ width: Math.max(1, r * 0.35), color: pip.color, alpha: 0.45 });
+        }
+      }
     },
     [pip, pieceSize],
   );

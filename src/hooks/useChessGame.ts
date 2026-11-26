@@ -5,7 +5,8 @@ import { haptic } from '../feedback/haptics';
 import { playSound } from '../feedback/sound';
 import { controls, type GameTransport } from '../net/transport';
 import type { Coord, GameState, Move } from '../types/game';
-import { modInfo, modsOf } from '../variants/catalog';
+import { modOfMove } from '../engine/rules/charges';
+import { modInfo } from '../variants/catalog';
 
 /**
  * Bridges any GameTransport into React and owns *UI-only* state (selection).
@@ -68,18 +69,10 @@ export function useChessGame(transport: GameTransport) {
       }
     }
     const dests = selectedMoves.filter((m, i, arr) => arr.findIndex((o) => sameCoord(o.to, m.to)) === i);
-    // Moves that exist only because of a plugged-in mod get the cartridge's colour.
-    const mods = modsOf(state.ruleset).flatMap((id) => modInfo(id) ?? []);
+    // Moves that spend a mod charge get the cartridge's colour (the engine flags them).
     const byMod = (m: Move) => {
-      const kind = state.board.pieces[m.pieceId]?.kind;
-      const df = m.to.file - m.from.file;
-      const dr = m.to.rank - m.from.rank;
-      return mods.find(
-        (mod) =>
-          mod.piece === kind &&
-          mod.diagram.added.some((v) => v.dFile === df && v.dRank === dr) &&
-          !mod.diagram.base.some((v) => v.dFile === df && v.dRank === dr),
-      );
+      const id = modOfMove(m);
+      return id ? modInfo(id) : undefined;
     };
     const modMoves = dests.filter((m) => byMod(m));
     const plain = dests.filter((m) => !byMod(m));

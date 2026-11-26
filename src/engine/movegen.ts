@@ -1,9 +1,10 @@
 import type { BoardEffect, Coord, Move, MoveFlag, Piece } from '../types/game';
 import { forwardOf, inBounds, occupied, pieceAt } from './board';
 import { getPieceDef } from './pieces/registry';
-import type { MoveMode } from './pieces/types';
-import { movementOf } from './rules/modifiers';
-import { getSpecialMove, type MoveGenContext } from './rules/specialRegistry';
+import type { MoveMode, MovementRule } from './pieces/types';
+import { modFlag } from './rules/charges';
+import { enhancementsOf } from './rules/modifiers';
+import { getSpecialMove, ownerPly, type MoveGenContext } from './rules/specialRegistry';
 import { canOccupy, canSlideThrough } from './tiles';
 
 /** Build a plain move/capture with its effect list. */
@@ -56,28 +57,39 @@ function expandPromotions(ctx: MoveGenContext, piece: Piece, moves: Move[]): Mov
   return out;
 }
 
+/** Moves produced by one movement rule (a piece's own rules and mod enhancements alike). */
+function ruleMoves(ctx: MoveGenContext, piece: Piece, from: Coord, rule: MovementRule, fwd: number): Move[] {
+  if (rule.type === 'special') return getSpecialMove(rule.id).generate(ctx, piece, from, rule.params ?? {});
+  const moves: Move[] = [];
+  const mode = rule.mode ?? 'both';
+  for (const v of rule.vectors) {
+    const df = v.dFile;
+    const dr = v.dRank * fwd;
+    const max = rule.type === 'leap' ? 1 : (rule.maxSteps ?? Infinity);
+    for (let step = 1; step <= max; step++) {
+      const to = { file: from.file + df * step, rank: from.rank + dr * step };
+      if (!inBounds(ctx.board, to)) break;
+      const kind = targetAllowed(ctx, piece, to, mode);
+      if (kind) moves.push(basicMove(ctx, piece, from, to));
+      if (rule.type === 'slide' && (pieceAt(ctx.board, to) || !canSlideThrough(ctx.board, to))) break;
+    }
+  }
+  return moves;
+}
+
 /** Pseudo-legal moves for one piece (may leave own royal in check). */
 export function pieceMoves(ctx: MoveGenContext, piece: Piece, from: Coord): Move[] {
   const def = getPieceDef(piece.kind);
   const fwd = def.directional ? forwardOf(piece.color) : 1;
   const moves: Move[] = [];
-
-  for (const rule of movementOf(ctx.modifiers, piece)) {
-    if (rule.type === 'special') {
-      moves.push(...getSpecialMove(rule.id).generate(ctx, piece, from, rule.params ?? {}));
-      continue;
-    }
-    const mode = rule.mode ?? 'both';
-    for (const v of rule.vectors) {
-      const df = v.dFile;
-      const dr = v.dRank * fwd;
-      const max = rule.type === 'leap' ? 1 : (rule.maxSteps ?? Infinity);
-      for (let step = 1; step <= max; step++) {
-        const to = { file: from.file + df * step, rank: from.rank + dr * step };
-        if (!inBounds(ctx.board, to)) break;
-        const kind = targetAllowed(ctx, piece, to, mode);
-        if (kind) moves.push(basicMove(ctx, piece, from, to));
-        if (rule.type === 'slide' && (pieceAt(ctx.board, to) || !canSlideThrough(ctx.board, to))) break;
+  for (const rule of def.movement) moves.push(...ruleMoves(ctx, piece, from, rule, fwd));
+  // Mod enhancements: only with charges left and off cooldown. A square the piece can
+  // already reach normally never spends a charge.
+  for (const [modId, rules] of enhancementsOf(ctx.modifiers, piece, ownerPly(ctx, piece.color))) {
+    for (const rule of rules) {
+      for (const m of ruleMoves(ctx, piece, from, rule, fwd)) {
+        if (moves.some((b) => b.to.file === m.to.file && b.to.rank === m.to.rank)) continue;
+        moves.push({ ...m, flags: [...m.flags, modFlag(modId)] });
       }
     }
   }

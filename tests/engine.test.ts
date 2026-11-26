@@ -112,7 +112,7 @@ describe('mod: knightCamel', () => {
   it('canonical ruleset', () => {
     expect(rulesetFor(['knightCamel', 'knightCamel'])).toEqual({
       name: 'knightCamel',
-      modifiers: [{ id: 'knightCamel', owner: null, data: {} }],
+      modifiers: [{ id: 'knightCamel', owner: null, data: { level: 1 } }],
     });
     expect(rulesetFor([])).toEqual({ name: 'standard', modifiers: [] });
   });
@@ -137,3 +137,37 @@ describe('mod: knightCamel', () => {
     expect(reduce(s, { type: 'reset' }).ruleset.name).toBe('knightCamel');
   });
 });
+
+describe('mod charges and cooldown', () => {
+  const sqr = (n: string) => ({ file: n.charCodeAt(0) - 97, rank: Number(n[1]) - 1 });
+  const go = (s: GameState, from: string, to: string) => reduce(s, { type: 'move', from: sqr(from), to: sqr(to) });
+  const leapsFrom = (s: GameState, from: string) =>
+    legal(s).filter((m) => m.from.file === sqr(from).file && m.from.rank === sqr(from).rank && m.flags.some((f) => f.startsWith('mod:'))).length;
+
+  it('level 2: two uses per knight, with a one-turn cooldown', () => {
+    let s = createGameState(standardBoard(), rulesetFor(['knightCamel'], () => 2));
+    s = go(s, 'b1', 'c4');
+    expect(s.history[0].flags).toContain('mod:knightCamel');
+    s = go(s, 'a7', 'a6');
+    expect(leapsFrom(s, 'c4')).toBe(0); // cooling down
+    s = go(go(s, 'g1', 'f3'), 'a6', 'a5');
+    expect(leapsFrom(s, 'c4')).toBeGreaterThan(0); // ready again
+    s = go(go(s, 'c4', 'f5'), 'a5', 'a4');
+    s = go(go(s, 'f3', 'g1'), 'b7', 'b6');
+    expect(leapsFrom(s, 'f5')).toBe(0); // spent
+  });
+
+  it('a spent knight no longer gives camel check', () => {
+    const s = withModsState('8/5k2/8/8/4N3/8/8/4K3 b - - 0 1');
+    const id = Object.values(s.board.pieces).find((p) => p.kind === 'knight')!.id;
+    expect(sideCheck(s)).toBe(true);
+    const spent = { ...s, ruleset: { ...s.ruleset, modifiers: [withUse(s.ruleset.modifiers[0], id, 0)] } };
+    expect(sideCheck(spent)).toBe(false);
+  });
+});
+
+import { sideInCheck as sideCheck, standardBoard } from '../src/engine';
+import { withUse } from '../src/engine/rules/charges';
+function withModsState(f: string): GameState {
+  return { ...fen(f), ruleset: rulesetFor(['knightCamel']) };
+}

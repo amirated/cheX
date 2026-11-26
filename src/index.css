@@ -546,3 +546,66 @@ html, body, #root {
 @media (prefers-reduced-motion: reduce) {
   .bay-slot.is-fresh .bay-cart, .bay-slot.is-fresh .cart-led, .mod-bay.is-powered::after, .mod-bay.is-powered .bay-led { animation: none !important; }
 }
+
+/* ───────────────────────── Mods: charges, status, rules & codex ───────────────────────── */
+
+.bay-cart-level { font: 900 7.5px ui-monospace, monospace; fill: #111; letter-spacing: .04em; }
+
+.mod-status { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 8px; font-size: 12px; }
+.mod-status-item {
+  display: inline-flex; align-items: center; gap: 8px; padding: 5px 10px;
+  border: 1px solid var(--shell); border-radius: var(--radius); background: var(--panel);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--shell) 20%, transparent);
+}
+.mod-status-item.is-cooling { border-style: dashed; box-shadow: none; }
+.mod-status-item.is-spent { border-color: var(--line); box-shadow: none; color: var(--muted); }
+.mod-status-code { font: 900 11px ui-monospace, monospace; color: var(--shell); letter-spacing: .08em; }
+.mod-status-name { font-weight: 800; }
+.mod-status-text { color: var(--muted); }
+.mod-status-item.is-ready .mod-status-text { color: #7dff9b; font-weight: 700; }
+.mod-status-charges { display: inline-flex; gap: 4px; }
+.mod-status-charges i, .lib-level i {
+  width: 8px; height: 8px; transform: rotate(45deg); display: inline-block;
+  border: 1.5px solid var(--shell, #ff9f1c); opacity: .5;
+}
+.mod-status-charges i.on, .lib-level i.on { background: var(--shell, #ff9f1c); opacity: 1; }
+.mod-status-item.is-cooling .mod-status-charges i.on { opacity: .45; }
+
+.lib-tabs { display: flex; gap: 4px; padding: 3px; border-radius: var(--radius); background: var(--panel-2); border: 1px solid var(--line); }
+.lib-tabs button {
+  flex: 1; padding: 8px 6px; border: 0; border-radius: calc(var(--radius) - 1px); background: none;
+  color: var(--muted); font-weight: 800; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; cursor: pointer;
+}
+.lib-tabs button.is-on { background: var(--accent); color: var(--bg); }
+
+.lib-level { display: inline-flex; align-items: center; gap: 5px; }
+.lib-level b { font: 900 10px ui-monospace, monospace; margin-left: 3px; color: var(--shell, #ff9f1c); }
+.lib-levelline { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+
+.lib-doc { display: flex; flex-direction: column; gap: 14px; font-size: 14px; line-height: 1.5; --shell: #ff9f1c; }
+.lib-doc h4 { margin: 0 0 4px; font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); }
+.lib-doc p { margin: 0 0 6px; }
+.lib-levels { width: 100%; border-collapse: collapse; font-size: 13px; }
+.lib-levels th { text-align: left; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); padding: 6px 8px; border-bottom: 1px solid var(--line); }
+.lib-levels td { padding: 8px; border-bottom: 1px solid var(--line); font-weight: 700; }
+
+.lib-codex article { padding: 12px; border-left: 2px solid var(--accent-2); background: var(--panel-2); border-radius: 0 var(--radius) var(--radius) 0; }
+.lib-codex h3 { margin: 2px 0 8px; font-size: 18px; }
+.codex-kicker { font: 800 10px ui-monospace, monospace; letter-spacing: .2em; text-transform: uppercase; color: var(--accent-2); }
+.lib-codex p { color: color-mix(in srgb, var(--ink) 85%, var(--muted)); }
+.codex-terms { margin: 0; display: grid; gap: 6px; }
+.codex-terms div { display: grid; grid-template-columns: 90px 1fr; gap: 8px; }
+.codex-terms dt { font: 800 12px ui-monospace, monospace; color: var(--accent); }
+.codex-terms dd { margin: 0; font-size: 13px; }
+
+.fx-burst-mod .fx-shard { box-shadow: 0 0 10px var(--c); }
+
+/* The library floats over the game as a sheet, so opening it never squeezes the board. */
+.mod-library {
+  position: fixed; z-index: 40; left: 50%; transform: translateX(-50%);
+  top: 84px; bottom: 12px; width: min(640px, calc(100vw - 24px)); max-height: none;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, .7), 0 0 0 1px var(--line);
+  animation: sheet-in .22s ease-out;
+}
+@keyframes sheet-in { from { opacity: 0; transform: translate(-50%, 12px); } }
+@media (prefers-reduced-motion: reduce) { .mod-library { animation: none; } }

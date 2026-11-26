@@ -11,7 +11,8 @@ import type { MoveAction } from '../src/types/game';
 
 let seed = 20261126;
 const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
-const initial = createGameState(standardBoard(), rulesetFor(['knightCamel']));
+// Level 2: each knight may leap twice, with a one-turn cooldown in between.
+const initial = createGameState(standardBoard(), rulesetFor(['knightCamel'], () => 2));
 let s = initial;
 const actions: MoveAction[] = [];
 const states: { after: number; state: unknown }[] = [];
@@ -20,11 +21,8 @@ let camel = 0;
 for (let i = 0; i < 90 && !isGameOver(s); i++) {
   const legal = legalMoves(s);
   // Prefer camel leaps when available so the fixture exercises the mod heavily.
-  const camels = legal.filter((m) => {
-    const df = Math.abs(m.to.file - m.from.file), dr = Math.abs(m.to.rank - m.from.rank);
-    return s.board.pieces[m.pieceId].kind === 'knight' && ((df === 3 && dr === 1) || (df === 1 && dr === 3));
-  });
-  const pool = camels.length && rnd() < 0.5 ? camels : legal;
+  const camels = legal.filter((m) => m.flags.some((f) => f.startsWith('mod:')));
+  const pool = camels.length && rnd() < 0.7 ? camels : legal;
   const m = pool[Math.floor(rnd() * pool.length)];
   if (camels.includes(m)) camel++;
   const a: MoveAction = { type: 'move', from: m.from, to: m.to, promotion: m.promotion ?? undefined };
