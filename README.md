@@ -25,6 +25,19 @@ There are two cyber themes, **Neon grid** and **Night city** (the default), and 
 - **UI side:** `src/index.css` defines matching CSS tokens under `[data-theme="…"]`. Night city's cut corners use `clip-path`; Neon grid's glow uses `box-shadow`.
 - **Adding a theme:** add an entry to `THEMES`, add a `[data-theme]` block in the CSS, and it appears in the settings panel automatically.
 
+## Mods (game variants)
+
+A mod changes one rule and can be switched on or off per game; classic chess is simply a game with no mods. The first one is **NC-01 Camel Knight**: knights may also make a (3,1) camel leap.
+
+- **In the app:** mods are cartridges. The **mod bay** on top of the board has three slots. Tap an empty slot (or the cartridge icon in the header) to open the **mod library**, which shows each mod's description, rules, a move diagram and lab notes from the cheX-research study. Plugging or ejecting a cartridge restarts a local game with the new rules. Quick match and "Play a friend" use whatever is in the bay; online rooms lock their mods for the whole room, rematches included. Pieces changed by a mod carry a small chip in the cartridge colour, and moves that only exist because of a mod are drawn as diamonds in that colour.
+- **In the engine:** a mod is a rule modifier with an `extraMovement(kind, color)` hook (`src/engine/rules/modifiers.ts`). The extra rules are used for move generation, attacks, check and mate, and the insufficient-material rule, exactly like a piece's own movement. A game's mods are its `ruleset.modifiers`; `rulesetFor(ids)` in `src/variants/catalog.ts` builds the canonical ruleset (sorted ids, name `a+b` or `standard`).
+- **Combos:** several mods in one ruleset just stack their extra movement. The bay shows one cartridge per mod.
+- **Adding a mod:**
+  1. Define it in `src/variants/` and register it in `src/engine/setup.ts`.
+  2. Add its library entry (code, rules, diagram, shell colour) to `MODS` in `src/variants/catalog.ts`.
+  3. Add the same id to the Rust registry in `cheX-BE/src/engine/registry.rs`, and to the bot's search board if it should play it (`cheX-BE/src/bot/position.rs`).
+  4. Record a parity game: `npx vite-node scripts/mod-parity-fixture.ts` (adapt the script for the new mod) and keep the Rust parity test green.
+
 ## Folder structure
 
 ```
@@ -61,12 +74,15 @@ src/
 │   ├── Hud.tsx
 │   ├── OnlineBar.tsx          # room code, seat, opponent presence, invite/leave
 │   ├── PlayerBar.tsx          # player identity + clock
-│   ├── SettingsPanel.tsx      # theme + piece-style picker
+│   ├── SettingsPanel.tsx      # theme, piece style, sound, haptics
+│   ├── mods/                  # ModBay (cartridge slots on the board), ModLibrary, Cartridge art, MoveDiagram
 │   └── TimeControlPicker.tsx  # presets / custom / no clock
 ├── hooks/                     # useChessGame (transport → React), useBoardSize
-├── net/                       # GameTransport seam: LocalTransport (offline), SocketTransport (cheX-BE server)
+├── net/                       # GameTransport seam: LocalTransport (offline), SocketTransport (cheX-BE server), matchmaking
+├── variants/                  # mod catalog (library text, rulesetFor), loadout (this device's bay), knightCamel
 └── App.tsx / main.tsx / index.css
-tests/engine.test.ts           # perft: start d4, Kiwipete d3, positions 3/4/5, plus reducer tests
+tests/engine.test.ts           # perft: start d4, Kiwipete d3, positions 3/4/5, reducer tests, mods
+scripts/mod-parity-fixture.ts  # records a camel-knight game for the Rust parity test
 ```
 
 ## Extending

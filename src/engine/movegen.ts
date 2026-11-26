@@ -2,6 +2,7 @@ import type { BoardEffect, Coord, Move, MoveFlag, Piece } from '../types/game';
 import { forwardOf, inBounds, occupied, pieceAt } from './board';
 import { getPieceDef } from './pieces/registry';
 import type { MoveMode } from './pieces/types';
+import { movementOf } from './rules/modifiers';
 import { getSpecialMove, type MoveGenContext } from './rules/specialRegistry';
 import { canOccupy, canSlideThrough } from './tiles';
 
@@ -61,7 +62,7 @@ export function pieceMoves(ctx: MoveGenContext, piece: Piece, from: Coord): Move
   const fwd = def.directional ? forwardOf(piece.color) : 1;
   const moves: Move[] = [];
 
-  for (const rule of def.movement) {
+  for (const rule of movementOf(ctx.modifiers, piece)) {
     if (rule.type === 'special') {
       moves.push(...getSpecialMove(rule.id).generate(ctx, piece, from, rule.params ?? {}));
       continue;

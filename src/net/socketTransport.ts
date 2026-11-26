@@ -218,11 +218,11 @@ export const SERVER_URL: string =
   (import.meta.env.VITE_SERVER_URL as string | undefined) ?? `${location.protocol}//${location.hostname}:4000`;
 
 /** Create a room. `timeControl: null` = untimed. */
-export async function createOnlineRoom(timeControl: TimeControl | null): Promise<string> {
+export async function createOnlineRoom(timeControl: TimeControl | null, mods: string[] = []): Promise<string> {
   const res = await fetch(`${SERVER_URL}/api/rooms`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(timeControl ? { timeControl } : {}),
+    body: JSON.stringify({ ...(timeControl ? { timeControl } : {}), mods }),
   });
   const body = (await res.json()) as { ok: boolean; roomId?: string; error?: string };
   if (!body.ok || !body.roomId) throw new Error(body.error ?? 'Could not create room');

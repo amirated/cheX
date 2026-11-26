@@ -6,7 +6,7 @@ import { markMatched, writeToken } from './socketTransport';
 /**
  * Quick match. Protocol (cheX-BE `matchmaking.rs`):
  *
- *   client → server  "match:find"   { timeControl? }   ack { ok }
+ *   client → server  "match:find"   { timeControl?, mods }   ack { ok }   (paired only on identical rules)
  *   client → server  "match:cancel" {}                 ack { ok, cancelled }
  *   server → client  "match:found"  { roomId, color, token }
  *   server → client  "match:error"  { error }
@@ -28,6 +28,7 @@ export interface MatchSearch {
 export function findMatch(
   url: string,
   timeControl: TimeControl | null,
+  mods: string[],
   handlers: { onFound: (m: MatchFound) => void; onError: (message: string) => void },
 ): MatchSearch {
   const socket: Socket = io(url, { transports: ['websocket'], reconnection: true });
@@ -43,7 +44,7 @@ export function findMatch(
     if (done) return;
     socket
       .timeout(5000)
-      .emitWithAck('match:find', timeControl ? { timeControl } : {})
+      .emitWithAck('match:find', { ...(timeControl ? { timeControl } : {}), mods })
       .then((res: { ok: boolean; error?: string }) => {
         if (!res.ok && !done) {
           finish();

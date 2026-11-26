@@ -63,7 +63,7 @@
 [data-pieces='outline'][data-theme='neonGrid'] { --side-white-edge: #22d3ee; --side-black-edge: #f472d0; }
 
 /* Night city: cut corners on panels and buttons. */
-[data-theme='nightCity'] :is(.hud, .online-bar, .settings, .player-bar, .reset, .ghost, .clock, .tc-option, .icon-btn, .settings-option) {
+[data-theme='nightCity'] :is(.hud, .online-bar, .settings, .mod-library, .player-bar, .reset, .ghost, .clock, .tc-option, .icon-btn, .settings-option) {
   clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, var(--cut) 100%, 0 calc(100% - var(--cut)));
 }
 [data-theme='nightCity'] :is(.clock, .ghost, .icon-btn, .tc-option) { --cut: 6px; }
@@ -94,7 +94,7 @@ html, body, #root {
 }
 
 /* Shared panel look */
-.hud, .online-bar, .settings, .player-bar {
+.hud, .online-bar, .settings, .mod-library, .player-bar {
   background: var(--panel);
   border-radius: var(--radius);
   box-shadow: var(--glow);
@@ -412,4 +412,137 @@ html, body, #root {
   .status-check, .status-checkmate, .fx-check, .fx-mate, .board-frame.is-your-turn,
   .gameover.is-live, .gameover.is-live .gameover-card, .gameover-title::before, .gameover-title::after { animation: none !important; }
   .fx-burst, .confetti { display: none; }
+}
+
+/* ───────────────────────── Mods: bay, cartridges, library ───────────────────────── */
+
+.mods-btn { position: relative; }
+.mods-count {
+  position: absolute; bottom: 2px; right: 2px; min-width: 13px; height: 13px; padding: 0 3px;
+  border-radius: 7px; font-size: 9px; font-weight: 800; line-height: 13px; text-align: center;
+  background: #ff9f1c; color: #111;
+}
+
+/* The bay: a console rail mounted on the board's top edge. Height = MOD_BAY_PX in App.tsx. */
+.mod-bay {
+  --mod-color: var(--accent);
+  position: relative; height: 72px; display: flex; flex-direction: column; gap: 3px;
+  padding: 3px 6px 0; margin-bottom: 0;
+  background: linear-gradient(180deg, var(--panel) 0%, var(--panel-2) 100%);
+  border: 1px solid var(--line); border-bottom: 0;
+  border-radius: calc(var(--radius) * 1.5) calc(var(--radius) * 1.5) 0 0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+[data-theme='nightCity'] .mod-bay { --cut: 10px; clip-path: polygon(var(--cut) 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%, 0 var(--cut)); }
+.board-column > .mod-bay + .board-frame { border-top-left-radius: 0; border-top-right-radius: 0; }
+
+.bay-rail { display: flex; align-items: center; gap: 8px; height: 12px; font-size: 9px; letter-spacing: .18em; color: var(--muted); }
+.bay-title { font-weight: 800; }
+.bay-status { display: inline-flex; align-items: center; gap: 5px; margin-left: auto; font-weight: 700; }
+.bay-led { width: 6px; height: 6px; border-radius: 50%; background: #3a3f4f; }
+.mod-bay.is-powered .bay-led { background: var(--mod-color); box-shadow: 0 0 6px var(--mod-color); animation: led-breathe 2.4s ease-in-out infinite; }
+.mod-bay.is-powered .bay-status { color: var(--ink); }
+.bay-lock { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); }
+@keyframes led-breathe { 50% { opacity: .55; } }
+
+.bay-slots { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; min-height: 0; }
+.bay-slot {
+  position: relative; padding: 0; border: 0; background: none; cursor: pointer; overflow: visible;
+  display: flex; align-items: flex-end; justify-content: center; touch-action: manipulation;
+}
+.bay-slot:disabled { cursor: default; }
+/* The port: a recessed slot the cartridge sits in. */
+.bay-port {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 9px; z-index: 2;
+  background: linear-gradient(180deg, #05060a 0%, #11131b 100%);
+  border-radius: 3px 3px 0 0; box-shadow: inset 0 2px 4px rgba(0, 0, 0, .9), 0 -1px 0 rgba(255, 255, 255, .06);
+}
+.bay-port::after { /* contact strip glinting in the port */
+  content: ''; position: absolute; left: 12%; right: 12%; top: 3px; height: 2px;
+  background: repeating-linear-gradient(90deg, #6b5a2a 0 3px, transparent 3px 6px); opacity: .7;
+}
+.bay-slot.is-empty { border: 1px dashed color-mix(in srgb, var(--muted) 45%, transparent); border-bottom: 0; border-radius: 4px 4px 0 0; }
+.bay-empty-label { position: absolute; top: 16px; left: 0; right: 0; font-size: 10px; font-weight: 800; letter-spacing: .16em; color: var(--muted); }
+.bay-slot.is-empty:not(:disabled):hover .bay-empty-label { color: var(--accent); }
+
+.bay-cart { position: relative; z-index: 1; width: 100%; height: auto; margin-bottom: 3px; display: block; filter: drop-shadow(0 -2px 6px color-mix(in srgb, var(--shell) 35%, transparent)); }
+.bay-cart-code { font: 900 13px ui-monospace, monospace; fill: #111; }
+.bay-cart-num { font: 800 10px ui-monospace, monospace; fill: #111; opacity: .8; }
+.bay-cart-name { font: 800 8.5px system-ui, sans-serif; fill: #fff; letter-spacing: .03em; }
+.bay-slot.is-loaded .bay-port { box-shadow: inset 0 2px 4px rgba(0, 0, 0, .9), 0 -2px 10px color-mix(in srgb, var(--mod-color) 50%, transparent); }
+.bay-slot.is-loaded:not(:disabled):hover .bay-cart { transform: translateY(-3px); transition: transform .15s; }
+.bay-slot.is-fresh .bay-cart { animation: cart-insert .55s cubic-bezier(.3, 1.5, .5, 1) both; }
+.bay-slot.is-fresh .cart-led { animation: led-boot .9s steps(1) .35s both; }
+@keyframes cart-insert { 0% { transform: translateY(-110%); opacity: 0; } 55% { transform: translateY(6%); opacity: 1; } 100% { transform: translateY(0); } }
+@keyframes led-boot { 0%, 40%, 70% { fill: #333; filter: none; } 20%, 55%, 100% { fill: #7dff9b; } }
+
+.cart-led { fill: #2a2d36; }
+.is-plugged .cart-led, .bay-cart .cart-led { fill: #7dff9b; filter: drop-shadow(0 0 3px #7dff9b); }
+
+/* Power traces: a plugged bay feeds the board — the frame lights up in the cartridge colour. */
+.board-column:has(.mod-bay.is-powered) .board-frame {
+  box-shadow: 0 0 0 1px var(--mod-color, #ff9f1c), 0 0 22px color-mix(in srgb, #ff9f1c 25%, transparent);
+}
+.mod-bay.is-powered::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; z-index: 3;
+  background: linear-gradient(90deg, transparent, var(--mod-color), transparent) 0 0 / 40% 100% no-repeat;
+  animation: trace-run 2.8s linear infinite;
+}
+@keyframes trace-run { from { background-position: -40% 0; } to { background-position: 140% 0; } }
+
+/* Big cartridge (library) */
+.cartridge { display: block; width: 100%; height: auto; overflow: visible; }
+.cart-code { font: 900 10px ui-monospace, monospace; fill: #111; letter-spacing: .06em; }
+.cart-tag { font: 800 7px ui-monospace, monospace; fill: #111; letter-spacing: .2em; }
+.cart-name { font: 900 13px system-ui, sans-serif; fill: #fff; letter-spacing: .03em; }
+
+/* Library panel */
+.mod-library { display: flex; flex-direction: column; gap: 12px; padding: 12px; max-height: min(70vh, 720px); overflow-y: auto; }
+.lib-head { display: flex; gap: 12px; align-items: flex-start; }
+.lib-head > div { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.lib-head strong { font-size: 15px; }
+.lib-head span { font-size: 12px; color: var(--muted); }
+.lib-card {
+  --shell: #ff9f1c;
+  display: flex; flex-direction: column; gap: 10px; padding: 12px;
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: calc(var(--radius) * 1.5);
+}
+.lib-card.is-in-bay { border-color: var(--shell); box-shadow: 0 0 0 1px var(--shell), 0 0 24px color-mix(in srgb, var(--shell) 22%, transparent); }
+.lib-top { display: grid; grid-template-columns: 112px 1fr; gap: 12px; align-items: center; }
+.lib-cart { filter: drop-shadow(0 6px 14px rgba(0, 0, 0, .5)); transition: transform .25s; }
+.lib-card:hover .lib-cart { transform: translateY(-3px) rotate(-2deg); }
+.lib-title { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.lib-title h3 { margin: 0; font-size: 20px; line-height: 1.1; }
+.lib-code { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font: 800 11px ui-monospace, monospace; letter-spacing: .12em; color: var(--shell); }
+.lib-badge { font-style: normal; font-size: 9px; letter-spacing: .12em; text-transform: uppercase; padding: 2px 6px; border-radius: 3px; border: 1px solid currentColor; }
+.lib-experimental { color: var(--accent-2); }
+.lib-stable { color: var(--ok); }
+.lib-live { color: #7dff9b; }
+.lib-tagline { margin: 0 0 4px; color: var(--muted); font-size: 13px; }
+.lib-desc { margin: 0; font-size: 14px; line-height: 1.45; }
+.lib-body { display: grid; grid-template-columns: 150px 1fr; gap: 12px; align-items: start; }
+@media (max-width: 420px) { .lib-body { grid-template-columns: 1fr; } .lib-figure { max-width: 200px; } }
+.lib-card h4 { margin: 0 0 6px; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.lib-rules { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 5px; font-size: 13px; line-height: 1.4; }
+.lib-rules li::marker { color: var(--shell); }
+.lib-figure { margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.lib-figure figcaption { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; font-size: 11px; color: var(--muted); }
+.md-key { width: 10px; height: 10px; display: inline-block; margin-left: 4px; }
+.md-key-base { border-radius: 50%; background: var(--accent-2); }
+.md-key-added { background: var(--shell); }
+.move-diagram { width: 100%; height: auto; border-radius: 4px; border: 1px solid var(--line); }
+.md-light { fill: color-mix(in srgb, var(--panel) 70%, #fff 6%); }
+.md-dark { fill: var(--bg); }
+.md-added { fill: var(--shell); opacity: .9; }
+.md-base { fill: var(--accent-2); }
+.md-piece { font-size: 20px; fill: var(--ink); }
+.lib-lab dl { margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 6px; }
+.lib-lab dl > div { padding: 6px 8px; border-radius: var(--radius); background: var(--panel); border: 1px solid var(--line); }
+.lib-lab dt { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; }
+.lib-lab dd { margin: 2px 0 0; font-weight: 800; font-size: 13px; }
+.lib-more { margin: 0; text-align: center; font-size: 12px; color: var(--muted); }
+
+@media (prefers-reduced-motion: reduce) {
+  .bay-slot.is-fresh .bay-cart, .bay-slot.is-fresh .cart-led, .mod-bay.is-powered::after, .mod-bay.is-powered .bay-led { animation: none !important; }
 }

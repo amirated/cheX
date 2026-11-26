@@ -82,6 +82,9 @@ export interface HighlightModel {
   quietTargets: Coord[];
   captureTargets: Coord[];
   checkSquare: Coord | null;
+  /** Destinations only reachable thanks to a plugged-in mod, drawn in the cartridge's colour. */
+  modTargets?: { at: Coord; capture: boolean }[];
+  modColor?: number;
 }
 
 /** Dynamic overlays. Cheap to redraw on every selection change. */
@@ -136,4 +139,24 @@ export function drawHighlights(g: Graphics, m: HighlightModel, orient: Orientati
     g.circle(c.x, c.y, tile * 0.44);
   }
   if (m.captureTargets.length) g.stroke({ width: tile * 0.075, color: H.hint.color, alpha: H.hint.alpha });
+
+  // Mod moves: diamonds (quiet) and square brackets (captures) in the cartridge colour.
+  const mods = m.modTargets ?? [];
+  if (mods.length) {
+    const color = m.modColor ?? H.hint.color;
+    for (const t of mods) {
+      const c = tileCenter(t.at, orient);
+      if (t.capture) continue;
+      const r = tile * 0.2;
+      g.poly([c.x, c.y - r, c.x + r, c.y, c.x, c.y + r, c.x - r, c.y]);
+    }
+    if (mods.some((t) => !t.capture)) g.fill({ color, alpha: 0.95 });
+    for (const t of mods) {
+      if (!t.capture) continue;
+      const o = tileOrigin(t.at, orient);
+      const inset = tile * 0.08;
+      g.rect(o.x + inset, o.y + inset, tile - inset * 2, tile - inset * 2);
+    }
+    if (mods.some((t) => t.capture)) g.stroke({ width: tile * 0.075, color, alpha: 0.95 });
+  }
 }

@@ -1,8 +1,10 @@
-import type { BoardState, Coord, JsonObject, Move, Piece } from '../../types/game';
+import type { ActiveRuleModifier, BoardState, Coord, JsonObject, Move, Piece } from '../../types/game';
 
 export interface MoveGenContext {
   board: BoardState;
   enPassant: Coord | null;
+  /** Rule modifiers in effect (game mods such as `knightCamel` extend piece movement). */
+  modifiers: ActiveRuleModifier[];
 }
 
 /**

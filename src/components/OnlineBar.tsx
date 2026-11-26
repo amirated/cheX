@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { TransportMeta } from '../net/transport';
 import { formatTimeControl, type TimeControl } from '../types/clock';
 import type { Color } from '../types/game';
+import { modInfo } from '../variants/catalog';
 import { TimeControlPicker } from './TimeControlPicker';
 
 interface Props {
@@ -21,6 +22,8 @@ interface Props {
   matched?: boolean;
   /** Online only: the game has ended. */
   over?: boolean;
+  /** Mods for the next game (local) or of this room (online). */
+  mods: string[];
 }
 
 const cap = (c: Color) => (c === 'white' ? 'White' : 'Black');
@@ -37,7 +40,8 @@ function Elapsed({ since }: { since: number }) {
 
 /** Local mode: quick match / play a friend. Online mode: room, seat, opponent presence, invite. */
 export function OnlineBar(props: Props) {
-  const { meta, creating, createError, searching, timeControl, matched, over } = props;
+  const { meta, creating, createError, searching, timeControl, matched, over, mods } = props;
+  const modLabel = mods.length ? mods.map((id) => modInfo(id)?.code ?? id).join(' + ') : 'Classic';
   const [copied, setCopied] = useState(false);
   const [picking, setPicking] = useState<'match' | 'friend' | null>(null);
 
@@ -50,6 +54,7 @@ export function OnlineBar(props: Props) {
             <strong>
               Finding an opponent
               {searching.timeControl ? ` · ${formatTimeControl(searching.timeControl)}` : ' · No clock'}
+              {` · ${modLabel}`}
             </strong>
             <span className={createError ? 'online-error' : 'online-hint'}>
               {createError ?? <Elapsed since={searching.since} />}
@@ -74,7 +79,9 @@ export function OnlineBar(props: Props) {
         <div className="online-bar online-bar-picker">
           <span className={createError ? 'online-error' : 'online-hint'}>
             {createError ??
-              (creating ? 'Creating game…' : picking === 'match' ? 'Quick match: choose a time control' : 'Play a friend: choose a time control')}
+              (creating
+                ? 'Creating game…'
+                : `${picking === 'match' ? 'Quick match' : 'Play a friend'} · ${modLabel}: choose a time control`)}
           </span>
           <TimeControlPicker busy={creating} onPick={pick} onCancel={() => setPicking(null)} />
         </div>

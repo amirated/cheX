@@ -1,5 +1,6 @@
 import { registerStandardPieces } from './pieces/standard';
-import { registerExampleModifiers } from './rules/modifiers';
+import { KNIGHT_CAMEL } from '../variants/knightCamel';
+import { registerExampleModifiers, registerRuleModifier } from './rules/modifiers';
 import { registerStandardSpecials } from './rules/standardSpecials';
 import { registerStandardTiles } from './tiles';
 
@@ -13,6 +14,8 @@ export function setupEngine(): void {
   registerStandardSpecials();
   registerStandardTiles();
   registerExampleModifiers();
+  // Game mods (see src/variants/catalog.ts). Inactive unless listed in a game's ruleset.
+  registerRuleModifier(KNIGHT_CAMEL);
 }
 
 setupEngine();

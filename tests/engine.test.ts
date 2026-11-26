@@ -99,3 +99,41 @@ describe('game reducer', () => {
     expect(legalMoves(relic).some((m) => m.flags.includes('castleKingside'))).toBe(false);
   });
 });
+
+// ───────────────────────────── game mods ─────────────────────────────
+
+import { rulesetFor } from '../src/variants/catalog';
+import { isInCheck as inCheck, legalMoves as legal, fromFEN as fen, gameReducer as reduce, canPossiblyMate as canMate } from '../src/engine';
+
+describe('mod: knightCamel', () => {
+  const withMods = (f: string, ids: string[]) => ({ ...fen(f), ruleset: rulesetFor(ids) });
+  const d4 = { file: 3, rank: 3 };
+
+  it('canonical ruleset', () => {
+    expect(rulesetFor(['knightCamel', 'knightCamel'])).toEqual({
+      name: 'knightCamel',
+      modifiers: [{ id: 'knightCamel', owner: null, data: {} }],
+    });
+    expect(rulesetFor([])).toEqual({ name: 'standard', modifiers: [] });
+  });
+
+  it('adds camel leaps only when plugged in', () => {
+    const f = '4k3/8/8/8/3N4/8/8/4K3 w - - 0 1';
+    const from = (s: ReturnType<typeof withMods>) => legal(s).filter((m) => m.from.file === d4.file && m.from.rank === d4.rank);
+    expect(from(withMods(f, []))).toHaveLength(8);
+    expect(from(withMods(f, ['knightCamel']))).toHaveLength(15);
+  });
+
+  it('camel leaps give check', () => {
+    const s = withMods('8/5k2/8/8/4N3/8/8/4K3 b - - 0 1', ['knightCamel']);
+    expect(inCheck(s.board, 'black', null, s.ruleset.modifiers)).toBe(true);
+    expect(inCheck(s.board, 'black')).toBe(false);
+  });
+
+  it('a lone camel knight is mating material; rematch keeps mods', () => {
+    const s = withMods('4k3/8/8/8/3N4/8/8/4K3 w - - 0 1', ['knightCamel']);
+    expect(canMate(s.board, 'white', s.ruleset.modifiers)).toBe(true);
+    expect(canMate(s.board, 'white')).toBe(false);
+    expect(reduce(s, { type: 'reset' }).ruleset.name).toBe('knightCamel');
+  });
+});

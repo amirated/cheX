@@ -1,6 +1,7 @@
-import type { BoardState, Color, Coord, Piece } from '../types/game';
+import type { ActiveRuleModifier, BoardState, Color, Coord, Piece } from '../types/game';
 import { forwardOf, inBounds, occupied, opposite, pieceIdAt } from './board';
 import { getPieceDef } from './pieces/registry';
+import { movementOf } from './rules/modifiers';
 import { getSpecialMove, type MoveGenContext } from './rules/specialRegistry';
 import { canSlideThrough } from './tiles';
 
@@ -10,7 +11,7 @@ export function pieceAttacks(ctx: MoveGenContext, piece: Piece, from: Coord, tar
   const def = getPieceDef(piece.kind);
   const fwd = def.directional ? forwardOf(piece.color) : 1;
 
-  for (const rule of def.movement) {
+  for (const rule of movementOf(ctx.modifiers, piece)) {
     if (rule.type === 'special') {
       const sp = getSpecialMove(rule.id);
       if (sp.attacks) {
@@ -51,8 +52,13 @@ export function isSquareAttacked(ctx: MoveGenContext, target: Coord, by: Color):
 }
 
 /** A side is in check if ANY of its royal pieces is attacked. No royals → never in check. */
-export function isInCheck(board: BoardState, color: Color, enPassant: Coord | null = null): boolean {
-  const ctx: MoveGenContext = { board, enPassant };
+export function isInCheck(
+  board: BoardState,
+  color: Color,
+  enPassant: Coord | null = null,
+  modifiers: ActiveRuleModifier[] = [],
+): boolean {
+  const ctx: MoveGenContext = { board, enPassant, modifiers };
   for (const { piece, at } of occupied(board)) {
     if (piece.color === color && getPieceDef(piece.kind).royal) {
       if (isSquareAttacked(ctx, at, opposite(color))) return true;

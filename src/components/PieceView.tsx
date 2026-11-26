@@ -13,6 +13,8 @@ interface Props {
   lifted: boolean;
   look: PieceLook;
   shadow: { color: number; alpha: number };
+  /** A plugged-in mod changes this piece: small glowing chip in the cartridge's colour. */
+  pip?: number | null;
 }
 
 const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
@@ -22,7 +24,7 @@ const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t 
  * (slide between tiles, simulated Z-lift, shadow offset) is done by mutating
  * transforms inside the Pixi ticker — no React re-renders per frame.
  */
-export function PieceView({ piece, at, orient, lifted, look, shadow: shadowStyle }: Props) {
+export function PieceView({ piece, at, orient, lifted, look, shadow: shadowStyle, pip = null }: Props) {
   const tile = orient.tile;
   const root = useRef<Container>(null);
   const body = useRef<Container>(null);
@@ -57,6 +59,19 @@ export function PieceView({ piece, at, orient, lifted, look, shadow: shadowStyle
   }, [target.x, target.y, tile, orient.flipped]);
 
   const drawBody = useCallback((g: Graphics) => drawPiece(g, piece.kind, look, pieceSize), [piece.kind, look, pieceSize]);
+  const drawPip = useCallback(
+    (g: Graphics) => {
+      g.clear();
+      if (pip == null) return;
+      const r = pieceSize * 0.09;
+      const x = pieceSize * 0.34;
+      const y = -pieceSize * 0.36;
+      g.circle(x, y, r * 2.1).fill({ color: pip, alpha: 0.22 });
+      g.poly([x, y - r * 1.25, x + r * 1.25, y, x, y + r * 1.25, x - r * 1.25, y]).fill({ color: pip });
+      g.poly([x, y - r * 1.25, x + r * 1.25, y, x, y + r * 1.25, x - r * 1.25, y]).stroke({ width: Math.max(1, r * 0.35), color: 0x000000, alpha: 0.6 });
+    },
+    [pip, pieceSize],
+  );
   const drawShadowCb = useCallback((g: Graphics) => drawShadow(g, pieceSize, shadowStyle), [pieceSize, shadowStyle]);
 
   const liftedRef = useRef(lifted);
@@ -106,6 +121,7 @@ export function PieceView({ piece, at, orient, lifted, look, shadow: shadowStyle
       <pixiGraphics ref={shadow} draw={drawShadowCb} y={pieceSize * 0.4} />
       <pixiContainer ref={body}>
         <pixiGraphics draw={drawBody} />
+        <pixiGraphics draw={drawPip} />
       </pixiContainer>
     </pixiContainer>
   );

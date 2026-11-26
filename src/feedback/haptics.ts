@@ -7,7 +7,19 @@
  *   fires reliably during a user gesture, so opponent moves may be silent on iOS).
  */
 
-export type HapticName = 'select' | 'move' | 'capture' | 'check' | 'illegal' | 'win' | 'lose' | 'draw' | 'lowTime' | 'start';
+export type HapticName =
+  | 'select'
+  | 'move'
+  | 'capture'
+  | 'check'
+  | 'illegal'
+  | 'win'
+  | 'lose'
+  | 'draw'
+  | 'lowTime'
+  | 'start'
+  | 'plug'
+  | 'eject';
 
 const PATTERNS: Record<HapticName, number | number[]> = {
   select: 6,
@@ -20,6 +32,8 @@ const PATTERNS: Record<HapticName, number | number[]> = {
   draw: [60, 80, 60],
   lowTime: 15,
   start: [20, 60, 20],
+  plug: [12, 50, 28],
+  eject: [20, 30, 8],
 };
 
 let enabled = true;
