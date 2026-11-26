@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { HighlightModel } from '../render/board';
 import type { PieceStyle, Theme } from '../render/theme';
 import type { BoardState, Coord } from '../types/game';
+import type { PipInfo } from './PieceView';
 import { BoardView } from './BoardView';
 
 // Register only the Pixi classes we use as JSX (<pixiContainer/>, <pixiGraphics/>, <pixiText/>).
@@ -26,12 +27,14 @@ interface Props {
   flipped?: boolean;
   theme: Theme;
   pieceStyle: PieceStyle;
+  /** Mod charges per piece id (drawn as chips on the piece). */
+  pips?: Record<string, PipInfo>;
 }
 
 /** Cap DPR at 3: beyond that mobile GPUs pay a lot of fill-rate for no visible gain. */
 const DPR = Math.min(window.devicePixelRatio || 1, 3);
 
-export function GameCanvas({ board, size, highlights, onSquare, flipped, theme, pieceStyle }: Props) {
+export function GameCanvas({ board, size, highlights, onSquare, flipped, theme, pieceStyle, pips }: Props) {
   // @pixi/react's first render awaits WebGL init, then commits the children it started
   // with — overwriting any newer props rendered meanwhile (e.g. the room state that
   // arrived while the canvas was initialising). Re-render once init completes so the
@@ -60,6 +63,7 @@ export function GameCanvas({ board, size, highlights, onSquare, flipped, theme, 
         flipped={flipped}
         theme={theme}
         pieceStyle={pieceStyle}
+        pips={pips}
       />
     </Application>
   );

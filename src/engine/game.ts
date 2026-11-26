@@ -1,5 +1,6 @@
 import './setup';
 import type {
+  ActiveRuleModifier,
   BoardState,
   Color,
   GameEvent,
@@ -15,7 +16,8 @@ import { createEmptyBoard, indexOf, opposite, sameCoord, squareName } from './bo
 import { applyEffects } from './effects';
 import { legalMoves, sideInCheck } from './legal';
 import { getPieceDef } from './pieces/registry';
-import { activeModifiersFor } from './rules/modifiers';
+import { modOfMove, withUse } from './rules/charges';
+import { activeModifiersFor, enhancementsOf } from './rules/modifiers';
 
 export const STANDARD_RULESET: Ruleset = { name: 'standard', modifiers: [] };
 
@@ -102,12 +104,18 @@ export const isGameOver = (s: GameState): boolean => GAME_OVER.has(s.status);
  * whether running out of time loses or draws. Deliberately conservative: only a
  * bare king, or king + one bishop/knight against a bare king, counts as "cannot".
  */
-export function canPossiblyMate(board: BoardState, color: Color): boolean {
+export function canPossiblyMate(board: BoardState, color: Color, modifiers: ActiveRuleModifier[] = []): boolean {
   const others = (c: Color) =>
     Object.values(board.pieces).filter((p) => p.color === c && !getPieceDef(p.kind).royal);
   const mine = others(color);
   if (mine.length === 0) return false;
-  if (mine.length === 1 && (mine[0].kind === 'knight' || mine[0].kind === 'bishop') && others(opposite(color)).length === 0) {
+  // A lone knight/bishop only counts as "cannot mate" while no game mod extends how it moves.
+  if (
+    mine.length === 1 &&
+    (mine[0].kind === 'knight' || mine[0].kind === 'bishop') &&
+    enhancementsOf(modifiers, mine[0], null).length === 0 &&
+    others(opposite(color)).length === 0
+  ) {
     return false;
   }
   return true;
@@ -172,8 +180,17 @@ export function applyMove(state: GameState, move: Move, legalBefore: Move[] = le
   }
 
   const resetClock = mover.kind === 'pawn' || removed.length > 0;
+  // A mod move spends one of the piece's charges and starts its cooldown.
+  const usedMod = modOfMove(move);
+  const ruleset = usedMod
+    ? {
+        ...state.ruleset,
+        modifiers: state.ruleset.modifiers.map((m) => (m.id === usedMod ? withUse(m, move.pieceId, state.ply) : m)),
+      }
+    : state.ruleset;
   let next: GameState = {
     ...state,
+    ruleset,
     board,
     turn: opposite(state.turn),
     enPassant: move.enPassantTarget,
@@ -209,7 +226,7 @@ export function gameReducer(state: GameState, action: MoveAction): GameState {
       if (isGameOver(state)) return pushEvents(state, [{ type: 'rejected', action, reason: 'Game is over' }]);
       const opponent = opposite(action.color);
       if (action.type === 'resign') return endGame(state, 'resigned', opponent);
-      return endGame(state, 'timeout', canPossiblyMate(state.board, opponent) ? opponent : null);
+      return endGame(state, 'timeout', canPossiblyMate(state.board, opponent, state.ruleset.modifiers) ? opponent : null);
     }
 
     case 'move': {

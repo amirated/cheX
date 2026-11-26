@@ -13,6 +13,8 @@ interface Props {
   lifted: boolean;
   look: PieceLook;
   shadow: { color: number; alpha: number };
+  /** A plugged-in mod enhances this piece: its charges, drawn as chips in the cartridge colour. */
+  pip?: PipInfo | null;
 }
 
 const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
@@ -22,7 +24,14 @@ const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t 
  * (slide between tiles, simulated Z-lift, shadow offset) is done by mutating
  * transforms inside the Pixi ticker — no React re-renders per frame.
  */
-export function PieceView({ piece, at, orient, lifted, look, shadow: shadowStyle }: Props) {
+export interface PipInfo {
+  color: number;
+  level: number;
+  charges: number;
+  cooling: boolean;
+}
+
+export function PieceView({ piece, at, orient, lifted, look, shadow: shadowStyle, pip = null }: Props) {
   const tile = orient.tile;
   const root = useRef<Container>(null);
   const body = useRef<Container>(null);
@@ -57,6 +66,34 @@ export function PieceView({ piece, at, orient, lifted, look, shadow: shadowStyle
   }, [target.x, target.y, tile, orient.flipped]);
 
   const drawBody = useCallback((g: Graphics) => drawPiece(g, piece.kind, look, pieceSize), [piece.kind, look, pieceSize]);
+  const drawPip = useCallback(
+    (g: Graphics) => {
+      g.clear();
+      if (!pip) return;
+      // One diamond per charge the level allows: filled = left, hollow = spent.
+      // While cooling down the remaining charges glow dim.
+      const r = pieceSize * 0.075;
+      const gap = r * 2.3;
+      const y = -pieceSize * 0.4;
+      const x0 = pieceSize * 0.42 - (pip.level - 1) * gap;
+      const diamond = (x: number) => [x, y - r, x + r, y, x, y + r, x - r, y];
+      if (pip.charges > 0) {
+        g.roundRect(x0 - r * 1.6, y - r * 1.6, (pip.level - 1) * gap + r * 3.2, r * 3.2, r * 1.6).fill({
+          color: 0x000000,
+          alpha: 0.45,
+        });
+      }
+      for (let i = 0; i < pip.level; i++) {
+        const pts = diamond(x0 + i * gap);
+        if (i < pip.charges) {
+          g.poly(pts).fill({ color: pip.color, alpha: pip.cooling ? 0.35 : 1 });
+        } else {
+          g.poly(pts).stroke({ width: Math.max(1, r * 0.35), color: pip.color, alpha: 0.45 });
+        }
+      }
+    },
+    [pip, pieceSize],
+  );
   const drawShadowCb = useCallback((g: Graphics) => drawShadow(g, pieceSize, shadowStyle), [pieceSize, shadowStyle]);
 
   const liftedRef = useRef(lifted);
@@ -106,6 +143,7 @@ export function PieceView({ piece, at, orient, lifted, look, shadow: shadowStyle
       <pixiGraphics ref={shadow} draw={drawShadowCb} y={pieceSize * 0.4} />
       <pixiContainer ref={body}>
         <pixiGraphics draw={drawBody} />
+        <pixiGraphics draw={drawPip} />
       </pixiContainer>
     </pixiContainer>
   );

@@ -4,7 +4,7 @@ import { FILES, indexOf } from '../engine';
 import { drawBoard, drawHighlights, isLightSquare, pixelToCoord, type HighlightModel, type Orientation } from '../render/board';
 import type { PieceStyle, Theme } from '../render/theme';
 import type { BoardState, Coord } from '../types/game';
-import { PieceView } from './PieceView';
+import { PieceView, type PipInfo } from './PieceView';
 
 interface Props {
   board: BoardState;
@@ -15,10 +15,12 @@ interface Props {
   flipped?: boolean;
   theme: Theme;
   pieceStyle: PieceStyle;
+  /** Mod charges per piece id. */
+  pips?: Record<string, PipInfo>;
 }
 
 /** Board + labels + highlight overlay + piece layer, all procedural. */
-export function BoardView({ board, size, highlights, onSquare, flipped = false, theme, pieceStyle }: Props) {
+export function BoardView({ board, size, highlights, onSquare, flipped = false, theme, pieceStyle, pips }: Props) {
   const tile = size / board.width;
   const orient: Orientation = useMemo(
     () => ({ tile, width: board.width, height: board.height, flipped }),
@@ -100,6 +102,7 @@ export function BoardView({ board, size, highlights, onSquare, flipped = false, 
             lifted={p.id === selectedId}
             look={theme.pieces[pieceStyle][p.color]}
             shadow={theme.shadow}
+            pip={pips?.[p.id] ?? null}
           />
         ))}
       </pixiContainer>

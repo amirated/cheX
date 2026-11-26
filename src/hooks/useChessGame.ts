@@ -4,7 +4,9 @@ import type { HighlightModel } from '../render/board';
 import { haptic } from '../feedback/haptics';
 import { playSound } from '../feedback/sound';
 import { controls, type GameTransport } from '../net/transport';
-import type { Coord, GameState } from '../types/game';
+import type { Coord, GameState, Move } from '../types/game';
+import { modOfMove } from '../engine/rules/charges';
+import { modInfo } from '../variants/catalog';
 
 /**
  * Bridges any GameTransport into React and owns *UI-only* state (selection).
@@ -67,12 +69,22 @@ export function useChessGame(transport: GameTransport) {
       }
     }
     const dests = selectedMoves.filter((m, i, arr) => arr.findIndex((o) => sameCoord(o.to, m.to)) === i);
+    // Moves that spend a mod charge get the cartridge's colour (the engine flags them).
+    const byMod = (m: Move) => {
+      const id = modOfMove(m);
+      return id ? modInfo(id) : undefined;
+    };
+    const modMoves = dests.filter((m) => byMod(m));
+    const plain = dests.filter((m) => !byMod(m));
+    const modColor = modMoves.length ? parseInt(byMod(modMoves[0])!.shell.slice(1), 16) : undefined;
     return {
       lastMove: last ? { from: last.from, to: last.to } : null,
       selected,
-      quietTargets: dests.filter((m) => !m.flags.includes('capture')).map((m) => m.to),
-      captureTargets: dests.filter((m) => m.flags.includes('capture')).map((m) => m.to),
+      quietTargets: plain.filter((m) => !m.flags.includes('capture')).map((m) => m.to),
+      captureTargets: plain.filter((m) => m.flags.includes('capture')).map((m) => m.to),
       checkSquare,
+      modTargets: modMoves.map((m) => ({ at: m.to, capture: m.flags.includes('capture') })),
+      modColor,
     };
   }, [state, selected, selectedMoves]);
 
@@ -83,7 +95,8 @@ export function useChessGame(transport: GameTransport) {
 
   // Drop a stale selection when the turn passes (e.g. opponent moved online).
   const activeSelected = myTurn ? selected : null;
-  const activeHighlights = activeSelected === selected ? highlights : { ...highlights, selected: null, quietTargets: [], captureTargets: [] };
+  const activeHighlights =
+    activeSelected === selected ? highlights : { ...highlights, selected: null, quietTargets: [], captureTargets: [], modTargets: [] };
 
   return { state, meta, myTurn, selected: activeSelected, highlights: activeHighlights, onSquare, reset, resign, sanLog };
 }

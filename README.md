@@ -25,6 +25,21 @@ There are two cyber themes, **Neon grid** and **Night city** (the default), and 
 - **UI side:** `src/index.css` defines matching CSS tokens under `[data-theme="…"]`. Night city's cut corners use `clip-path`; Neon grid's glow uses `box-shadow`.
 - **Adding a theme:** add an entry to `THEMES`, add a `[data-theme]` block in the CSS, and it appears in the settings panel automatically.
 
+## Mods (game variants)
+
+A mod changes one rule and can be switched on or off per game; classic chess is simply a game with no mods. The first one is **NC-01 Camel Knight**: knights may also make a (3,1) camel leap.
+
+- **In the app:** mods are cartridges. The **mod bay** on top of the board has three slots. Tap an empty slot (or the cartridge icon in the header) to open the **mod library**, which shows each mod's description, rules, a move diagram and lab notes from the cheX-research study. Plugging or ejecting a cartridge restarts a local game with the new rules. Quick match and "Play a friend" use whatever is in the bay; online rooms lock their mods for the whole room, rematches included. Pieces changed by a mod carry a small chip in the cartridge colour, and moves that only exist because of a mod are drawn as diamonds in that colour.
+- **Levels, charges, cooldown:** each enhanced piece may use its mod as many times per game as its level (1–3), with a one-turn cooldown after every use. A spent or cooling piece moves and threatens only normally. Levels will come from player progression; for now everyone is level 1 (`src/variants/progression.ts`), and online games use the lower of the two players' levels (decided by the server). The library's **Rules** tab explains all this and the **Codex** tab holds the lore; both live in `src/variants/codex.ts`.
+- **In the engine:** a mod is a rule modifier with an `extraMovement(kind, color)` hook (`src/engine/rules/modifiers.ts`). Charges and cooldown are generic (`src/engine/rules/charges.ts`): move generation adds a piece's enhanced moves only while it has a charge and is off cooldown, flags them `mod:<id>`, and applying such a move records the use in the modifier's `data` (`{ level, uses: { pieceId: [count, lastPly] } }`). Attacks, check, mate and the insufficient-material rule all use the same availability, judged at the owner's next move. `rulesetFor(ids, levelOf)` in `src/variants/catalog.ts` builds the canonical ruleset.
+- **On screen, for any piece mod:** chips on each enhanced piece show its charges (bright, dim while cooling, hollow when spent); moves that spend a charge are drawn as diamonds in the cartridge colour; selecting the piece shows a status line under the board; ◆ marks charged moves in the log; firing a charge plays its own sound and a burst in the cartridge colour.
+- **Combos:** several mods in one ruleset just stack their extra movement. The bay shows one cartridge per mod.
+- **Adding a mod** (charges, cooldown, levels, chips, highlights, status line and rules text then work on their own):
+  1. Define it in `src/variants/` (an `extraMovement` for its piece kind) and register it in `src/engine/setup.ts`.
+  2. Add its library entry (code, rules, diagram, shell colour) to `MODS` in `src/variants/catalog.ts`.
+  3. Add the same id to the Rust registry in `cheX-BE/src/engine/registry.rs`, and to the bot's search board if it should play it (`cheX-BE/src/bot/position.rs`).
+  4. Record a parity game: `npx vite-node scripts/mod-parity-fixture.ts` (adapt the script for the new mod) and keep the Rust parity test green.
+
 ## Folder structure
 
 ```
@@ -61,12 +76,15 @@ src/
 │   ├── Hud.tsx
 │   ├── OnlineBar.tsx          # room code, seat, opponent presence, invite/leave
 │   ├── PlayerBar.tsx          # player identity + clock
-│   ├── SettingsPanel.tsx      # theme + piece-style picker
+│   ├── SettingsPanel.tsx      # theme, piece style, sound, haptics
+│   ├── mods/                  # ModBay (cartridge slots on the board), ModLibrary, Cartridge art, MoveDiagram
 │   └── TimeControlPicker.tsx  # presets / custom / no clock
 ├── hooks/                     # useChessGame (transport → React), useBoardSize
-├── net/                       # GameTransport seam: LocalTransport (offline), SocketTransport (cheX-BE server)
+├── net/                       # GameTransport seam: LocalTransport (offline), SocketTransport (cheX-BE server), matchmaking
+├── variants/                  # mod catalog (library text, rulesetFor), loadout (this device's bay), knightCamel
 └── App.tsx / main.tsx / index.css
-tests/engine.test.ts           # perft: start d4, Kiwipete d3, positions 3/4/5, plus reducer tests
+tests/engine.test.ts           # perft: start d4, Kiwipete d3, positions 3/4/5, reducer tests, mods
+scripts/mod-parity-fixture.ts  # records a camel-knight game for the Rust parity test
 ```
 
 ## Extending

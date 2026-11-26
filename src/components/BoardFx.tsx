@@ -32,7 +32,11 @@ export function BoardFx({ size, files, ranks, flipped, bursts, checkSquare, mate
     <div className="board-fx" aria-hidden>
       {checkSquare && <div className={`fx-check${mate ? ' fx-mate' : ''}`} style={place(checkSquare)} />}
       {bursts.map((b) => (
-        <div key={b.id} className={`fx-burst fx-burst-${b.color}`} style={place(b.at)}>
+        <div
+          key={b.id}
+          className={`fx-burst fx-burst-${b.color}${b.tint ? ' fx-burst-mod' : ''}`}
+          style={{ ...place(b.at), ...(b.tint ? ({ '--c': b.tint } as CSSProperties) : {}) }}
+        >
           <span className="fx-flash" />
           {Array.from({ length: SHARDS }, (_, i) => (
             <span

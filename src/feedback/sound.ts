@@ -20,7 +20,10 @@ export type SoundName =
   | 'lose'
   | 'draw'
   | 'lowTime'
-  | 'tick';
+  | 'tick'
+  | 'plug'
+  | 'eject'
+  | 'enhance';
 
 /** Tonal flavour per theme: Neon grid is synth-wave, Night city is punchier and darker. */
 export type SoundFlavour = 'synth' | 'street';
@@ -194,6 +197,28 @@ const SOUNDS: Record<SoundName, (c: AudioContext, out: AudioNode) => void> = {
     tone(c, o, { freq: 1050, dur: 0.06, gain: 0.12, type: 'square', cutoff: 2500 });
   },
   tick: (c, o) => noise(c, o, { dur: 0.03, freq: 3500, q: 3, gain: 0.25 }),
+  plug: (c, o) => {
+    // cartridge seats (two-stage clunk), then the bay powers up
+    noise(c, o, { dur: 0.05, freq: 1400, q: 1.5, gain: 0.5 });
+    tone(c, o, { freq: 140, to: 70, dur: 0.12, gain: 0.45, at: 0.01 });
+    noise(c, o, { at: 0.07, dur: 0.04, freq: 3200, q: 2, gain: 0.35 });
+    const type: OscillatorType = flavour === 'synth' ? 'square' : 'sawtooth';
+    tone(c, o, { freq: note(-12), to: note(12), dur: 0.32, gain: 0.07, type, cutoff: 2400, at: 0.16 });
+    tone(c, o, { freq: note(12), dur: 0.12, gain: 0.08, type: 'sine', at: 0.46 });
+    tone(c, o, { freq: note(19), dur: 0.18, gain: 0.08, type: 'sine', at: 0.55 });
+  },
+  enhance: (c, o) => {
+    // a mod charge fires: rising zap with a sparkle on top
+    const type: OscillatorType = flavour === 'synth' ? 'square' : 'sawtooth';
+    tone(c, o, { freq: 180, to: 1400, dur: 0.18, gain: 0.12, type, cutoff: 3000 });
+    noise(c, o, { dur: 0.2, freq: 3000, to: 8000, q: 1.5, gain: 0.18 });
+    [24, 28, 31].forEach((s, i) => tone(c, o, { freq: note(s), dur: 0.1, gain: 0.06, at: 0.12 + i * 0.04 }));
+  },
+  eject: (c, o) => {
+    noise(c, o, { dur: 0.06, freq: 2600, to: 900, q: 1.2, gain: 0.4 });
+    tone(c, o, { freq: note(12), to: note(-12), dur: 0.28, gain: 0.07, type: 'triangle', at: 0.04 });
+    tone(c, o, { freq: 220, to: 110, dur: 0.08, gain: 0.3, at: 0.02 });
+  },
 };
 
 /** Per-sound loudness trim (measured offline so a move reads clearly on a phone speaker). */
@@ -212,6 +237,9 @@ const LEVEL: Record<SoundName, number> = {
   draw: 3.2,
   lowTime: 6,
   tick: 9,
+  plug: 3,
+  eject: 3,
+  enhance: 3,
 };
 
 export function playSound(name: SoundName) {

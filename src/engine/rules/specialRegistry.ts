@@ -1,9 +1,17 @@
-import type { BoardState, Coord, JsonObject, Move, Piece } from '../../types/game';
+import type { ActiveRuleModifier, BoardState, Color, Coord, JsonObject, Move, Piece } from '../../types/game';
 
 export interface MoveGenContext {
   board: BoardState;
   enPassant: Coord | null;
+  /** Rule modifiers in effect (game mods such as `knightCamel` extend piece movement). */
+  modifiers: ActiveRuleModifier[];
+  /** Side to move and current ply: mod charges/cooldown are judged at `ownerPly`. */
+  turn: Color;
+  ply: number;
 }
+
+/** The ply on which `color` next moves, from this position. */
+export const ownerPly = (ctx: MoveGenContext, color: Color): number => (color === ctx.turn ? ctx.ply : ctx.ply + 1);
 
 /**
  * A hand-written movement ability (castling, en passant, a future "swap with ally",
