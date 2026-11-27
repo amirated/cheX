@@ -48,7 +48,7 @@ export function OnlineBar(props: Props) {
   if (meta.mode === 'local') {
     if (searching) {
       return (
-        <div className="online-bar">
+        <div key="searching" className="online-bar is-swap">
           <span className="dot dot-wait dot-pulse" />
           <div className="online-text">
             <strong>
@@ -76,7 +76,7 @@ export function OnlineBar(props: Props) {
         }
       };
       return (
-        <div className="online-bar online-bar-picker">
+        <div key="picking" className="online-bar online-bar-picker is-swap">
           <span className={createError ? 'online-error' : 'online-hint'}>
             {createError ??
               (creating
@@ -88,7 +88,7 @@ export function OnlineBar(props: Props) {
       );
     }
     return (
-      <div className="online-bar">
+      <div key="idle" className="online-bar is-swap">
         <span className={createError ? 'online-error' : 'online-hint'}>{createError ?? 'Playing on this device'}</span>
         <button className="reset" type="button" onClick={() => setPicking('match')}>
           Quick match

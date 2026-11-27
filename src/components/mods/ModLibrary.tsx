@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { MAX_SLOTS, MODS } from '../../variants/catalog';
 import { CODEX, LEVELS, RULES } from '../../variants/codex';
 import { MAX_LEVEL, playerLevel } from '../../variants/progression';
@@ -22,6 +22,11 @@ type Tab = 'cartridges' | 'rules' | 'codex';
 export function ModLibrary({ loadout, active, editable, onToggle, onClose }: Props) {
   const full = loadout.length >= MAX_SLOTS;
   const [tab, setTab] = useState<Tab>('cartridges');
+  const scrollRef = useRef<HTMLDivElement>(null);
+  // Each tab opens at its top; only this panel scrolls, the header and tabs stay put.
+  useLayoutEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0 });
+  }, [tab]);
   return (
     <section className="mod-library" aria-label="Mod library">
       <header className="lib-head">
@@ -43,6 +48,7 @@ export function ModLibrary({ loadout, active, editable, onToggle, onClose }: Pro
           </button>
         ))}
       </div>
+      <div className="lib-scroll" ref={scrollRef} role="tabpanel">
       {tab === 'rules' && <RulesTab />}
       {tab === 'codex' && <CodexTab />}
       {tab === 'cartridges' && (
@@ -116,6 +122,7 @@ export function ModLibrary({ loadout, active, editable, onToggle, onClose }: Pro
       <p className="lib-more">More cartridges are in the lab. Combos: plug up to {MAX_SLOTS} at once.</p>
         </>
       )}
+      </div>
     </section>
   );
 }

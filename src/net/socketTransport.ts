@@ -1,5 +1,5 @@
 import { io, type Socket } from 'socket.io-client';
-import { createGameState } from '../engine';
+import { createGameState, gameReducer } from '../engine';
 import type { ClockSnapshot, ClockView, TimeControl } from '../types/clock';
 import type { Color, GameEvent, GameState, MoveAction } from '../types/game';
 import type { GameTransport, Presence, TransportMeta } from './transport';
@@ -15,6 +15,12 @@ import type { GameTransport, Presence, TransportMeta } from './transport';
  *
  * The seat token is kept in localStorage per room, so a refresh or a dropped
  * connection reclaims the same colour.
+ *
+ * Optimistic moves: our own move is played through the same reducer the server runs
+ * the moment it is sent, so the piece moves (and sounds) with no network wait. The
+ * server's update for that move then lands on an identical state and replaces it
+ * silently (its events are already known); if the server refuses the move we resync
+ * to the authoritative position.
  *
  * Clocks: the server sends a snapshot only when something changes (a move, a flag
  * fall, a join/resync). We count down locally from that snapshot on the monotonic
@@ -86,6 +92,8 @@ export class SocketTransport implements GameTransport {
   private clock: ClockView | null = null;
   /** Smoothed one-way network delay (half the measured round trip). */
   private latencyMs = 0;
+  /** Our own move, shown before the server confirmed it (the state it was played from). */
+  private pending: { before: GameState } | null = null;
   private listeners = new Set<(s: GameState, e: GameEvent[]) => void>();
   private metaListeners = new Set<() => void>();
   private clockListeners = new Set<() => void>();
@@ -159,10 +167,49 @@ export class SocketTransport implements GameTransport {
   private apply(state: GameState, events: GameEvent[], clock: ClockSnapshot | null, force = false) {
     // Ignore out-of-order snapshots (e.g. a late update after a resync).
     if (!force && state.nextSeq < this.state.nextSeq) return;
+    // Events we already showed optimistically are not news.
+    const fresh = force ? events : events.filter((e) => e.seq >= this.state.nextSeq);
+    this.pending = null;
     this.state = state;
     this.clock = clock ? { ...clock, receivedAt: performance.now(), latencyMs: this.latencyMs } : null;
-    this.listeners.forEach((l) => l(state, events));
+    this.listeners.forEach((l) => l(state, fresh));
     this.clockListeners.forEach((l) => l());
+  }
+
+  /** Play our own move locally before the server confirms it. Returns false if it changed nothing. */
+  private predict(action: MoveAction): boolean {
+    if (action.type !== 'move' || !this.meta.seat || this.state.turn !== this.meta.seat) return false;
+    const prev = this.state;
+    const next = gameReducer(prev, { ...action, color: this.meta.seat });
+    const fresh = next.events.filter((e) => e.seq >= prev.nextSeq);
+    if (next.ply === prev.ply || fresh.some((e) => e.type === 'rejected')) return false;
+    this.pending = { before: prev };
+    this.state = next;
+    // Stop our clock and start theirs right away, as the server will (cheX-BE clock::on_move).
+    if (this.clock && !this.clock.flagged) {
+      const now = performance.now();
+      const mine = this.meta.seat;
+      const over = !(next.status === 'inProgress' || next.status === 'check');
+      const remaining = { ...this.clock.remainingMs };
+      if (this.clock.running === mine) {
+        const elapsed = Math.max(0, now - this.clock.receivedAt + this.clock.latencyMs);
+        remaining[mine] = Math.max(0, remaining[mine] - elapsed) + (over ? 0 : this.clock.timeControl.incrementMs);
+      }
+      this.clock = { ...this.clock, remainingMs: remaining, running: over ? null : next.turn, receivedAt: now, latencyMs: 0 };
+      this.clockListeners.forEach((l) => l());
+    }
+    this.listeners.forEach((l) => l(next, fresh));
+    return true;
+  }
+
+  /** The server refused our predicted move: show the position it was played from again. */
+  private rollback() {
+    if (!this.pending) return;
+    const { before } = this.pending;
+    this.pending = null;
+    this.state = before;
+    this.listeners.forEach((l) => l(before, []));
+    void this.sync();
   }
 
   private setMeta(patch: Partial<TransportMeta>) {
@@ -176,9 +223,11 @@ export class SocketTransport implements GameTransport {
 
   send = (action: MoveAction) => {
     // expectedSeq lets the server refuse duplicates and moves made on an outdated position.
+    const expectedSeq = this.state.nextSeq;
+    this.predict(action);
     this.socket
       .timeout(8000)
-      .emitWithAck('action', { ...action, expectedSeq: this.state.nextSeq })
+      .emitWithAck('action', { ...action, expectedSeq })
       .then((res: ActionAck) => {
         if (res.ok) {
           if (this.meta.error) this.setMeta({ error: null });
@@ -188,9 +237,13 @@ export class SocketTransport implements GameTransport {
           void this.sync(); // our view was behind: show the real position/clock instead of an error
           return;
         }
+        this.rollback();
         this.setMeta({ error: res.error });
       })
-      .catch(() => this.setMeta({ error: 'Server did not respond' }));
+      .catch(() => {
+        this.setMeta({ error: 'Server did not respond' });
+        void this.sync(); // the move may or may not have landed: ask
+      });
   };
 
   subscribe = (l: (s: GameState, e: GameEvent[]) => void) => {
