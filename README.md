@@ -17,6 +17,13 @@ Online games show a player bar with each clock above and below the board. The se
 
 Without `?room=`, the game runs fully offline as local pass-and-play, exactly as before.
 
+## Layout and fullscreen
+
+- **Portrait** (phones, narrow windows): everything is stacked and the board is as wide as the screen. The mod bay sits on its top edge, and in online games the player bars hug the board above and below.
+- **Landscape** (computers, tablets or phones on their side, any window at least 700px wide and 5:4 or wider): the board fills the full height on the left, the mod bay runs down its left edge, and the HUD, players, mod status and the full move list sit in a side panel.
+- The board takes the largest whole-pixel size that fits (`useBoardSize`). Both layouts share one DOM order and CSS grid areas place the pieces, so rotating a device never reloads the board.
+- **Fullscreen:** the corner button in the header, or the F key (Esc to leave), with the screen kept awake while fullscreen. iPhone Safari has no fullscreen button; there, "Add to Home Screen" opens CheX as a full-screen app (`public/manifest.webmanifest`).
+
 ## Themes
 
 There are two cyber themes, **Neon grid** and **Night city** (the default), and each can show pieces **filled** or as **outlines**. Players pick these in the settings panel (the sliders icon in the header). The choice is saved per device in `localStorage` and never sent to the server, so each player sees their own look.

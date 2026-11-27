@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { BoardFx } from './components/BoardFx';
-import { ModBay } from './components/mods/ModBay';
+import { BAY_DEPTH, ModBay } from './components/mods/ModBay';
 import { ModLibrary, ModsButton } from './components/mods/ModLibrary';
 import { createGameState, standardBoard } from './engine';
 import { haptic } from './feedback/haptics';
@@ -17,6 +17,8 @@ import { SettingsButton, SettingsPanel } from './components/SettingsPanel';
 import { usePreferences } from './prefs/preferences';
 import { THEMES } from './render/theme';
 import { useBoardSize } from './hooks/useBoardSize';
+import { useLayoutMode } from './hooks/useLayoutMode';
+import { FullscreenButton } from './components/FullscreenButton';
 import { useChessGame } from './hooks/useChessGame';
 import { useClock } from './hooks/useClock';
 import { findMatch, type MatchSearch } from './net/matchmaking';
@@ -58,10 +60,12 @@ const initialQuick = quickParam();
 if (initialQuick !== undefined) history.replaceState(null, '', location.pathname);
 let quickStarted = false;
 
-/** Height of one player bar incl. its gap (keep in sync with .player-bar in index.css). */
-const PLAYER_BAR_PX = 48;
-/** Height of the mod bay above the board incl. its gap (keep in sync with .mod-bay). */
-const MOD_BAY_PX = 72;
+/** Gap between the mod bay and the board (keep in sync with .board-column in index.css). */
+const BAY_GAP = 0;
+/** Height of a player bar plus its gap, when bars sit above/below the board in portrait. */
+const PLAYER_BAR_PX = 46;
+/** Portrait: room kept under the board for the mod status line and the move log. */
+const PORTRAIT_LOG_PX = 56;
 
 export default function App() {
   const { state, meta, myTurn, highlights, onSquare, reset, resign, sanLog } = useChessGame(transport);
@@ -87,8 +91,16 @@ export default function App() {
   const search = useRef<MatchSearch | null>(null);
 
   const online = meta.mode === 'online';
+  const layout = useLayoutMode();
+  const landscape = layout === 'landscape';
   const stageRef = useRef<HTMLDivElement>(null);
-  const size = useBoardSize(stageRef, 640, (online ? PLAYER_BAR_PX * 2 : 0) + MOD_BAY_PX);
+  // As big as the screen allows: full width in portrait, full height in landscape. The
+  // mod bay sits on the board's top edge (portrait) or left edge (landscape).
+  const size = useBoardSize(
+    stageRef,
+    landscape ? { x: BAY_DEPTH + BAY_GAP } : { y: BAY_DEPTH + BAY_GAP + PORTRAIT_LOG_PX + (online ? PLAYER_BAR_PX * 2 : 0) },
+    layout,
+  );
 
   // Mods of the game on screen (an online room's are fixed when the room is made).
   const activeMods = modsOf(state.ruleset);
@@ -172,8 +184,13 @@ export default function App() {
     const mark = (i: number) => (state.history[i]?.flags.some((f) => f.startsWith('mod:')) ? '◆' : '');
     const san = (i: number) => `${sanLog[i]}${mark(i)}`;
     for (let i = 0; i < sanLog.length; i += 2) rows.push(`${i / 2 + 1}. ${san(i)}${sanLog[i + 1] ? ' ' + san(i + 1) : ''}`);
-    return rows.slice(-4);
+    return rows;
   }, [sanLog, state.history]);
+  // Keep the newest move in view when the full log scrolls (landscape).
+  const logRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    logRef.current?.scrollTo({ top: logRef.current.scrollHeight });
+  }, [moves.length]);
 
   // You at the bottom; spectators see White at the bottom.
   const bottom: Color = meta.seat ?? 'white';
@@ -212,78 +229,103 @@ export default function App() {
     );
   };
 
+  const hud = (
+    <Hud
+      turn={state.turn}
+      status={state.status}
+      winner={state.winner}
+      moveNumber={state.fullmoveNumber}
+      onReset={reset}
+      onResign={resign}
+      seat={online ? meta.seat : undefined}
+      extra={
+        <>
+          <ModsButton
+            open={libraryOpen}
+            count={activeMods.length}
+            onClick={() => {
+              setLibraryOpen((o) => !o);
+              setSettingsOpen(false);
+            }}
+          />
+          <SettingsButton
+            open={settingsOpen}
+            onClick={() => {
+              setSettingsOpen((o) => !o);
+              setLibraryOpen(false);
+            }}
+          />
+          <FullscreenButton />
+        </>
+      }
+    />
+  );
+
+  const bay = (
+    <ModBay
+      mods={online ? activeMods : loadout}
+      editable={!online}
+      fresh={freshMod}
+      vertical={landscape}
+      length={size}
+      levels={
+        online
+          ? Object.fromEntries(state.ruleset.modifiers.map((m) => [m.id, levelOf(m)]))
+          : Object.fromEntries(loadout.map((id) => [id, playerLevel(id)]))
+      }
+      onOpenLibrary={() => {
+        setLibraryOpen(true);
+        setSettingsOpen(false);
+      }}
+      onEject={toggleMod}
+    />
+  );
+
+  // One DOM order for both layouts; CSS grid areas place the pieces (see .app in index.css),
+  // so switching orientation never remounts the board canvas.
+  // Move log + mod status: the side column in landscape, right under the board in portrait.
+  const log = (
+    <>
+      <ModStatusLine state={state} selected={highlights.selected} />
+      <footer className="movelog" ref={logRef}>
+        {moves.length === 0 ? (
+          <span className="movelog-empty">Tap a piece to begin</span>
+        ) : landscape ? (
+          moves.map((row) => <span key={row}>{row}</span>)
+        ) : (
+          moves.slice(-4).join('   ')
+        )}
+      </footer>
+    </>
+  );
+
   return (
-    <main className="app">
-      <Hud
-        turn={state.turn}
-        status={state.status}
-        winner={state.winner}
-        moveNumber={state.fullmoveNumber}
-        onReset={reset}
-        onResign={resign}
-        seat={online ? meta.seat : undefined}
-        extra={
-          <>
-            <ModsButton
-              open={libraryOpen}
-              count={activeMods.length}
-              onClick={() => {
-                setLibraryOpen((o) => !o);
-                setSettingsOpen(false);
-              }}
-            />
-            <SettingsButton
-              open={settingsOpen}
-              onClick={() => {
-                setSettingsOpen((o) => !o);
-                setLibraryOpen(false);
-              }}
-            />
-          </>
-        }
-      />
-      {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
-      {libraryOpen && (
-        <ModLibrary
-          loadout={loadout}
-          active={activeMods}
-          editable={!online}
-          onToggle={toggleMod}
-          onClose={() => setLibraryOpen(false)}
+    <main className={`app is-${layout}${online ? ' is-online' : ''}`} style={{ ['--board' as string]: `${size}px` }}>
+      <div className="area-top">
+        {hud}
+        {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
+      </div>
+      <div className="area-online">
+        <OnlineBar
+          meta={meta}
+          onPlayFriend={playOnline}
+          onQuickMatch={quickMatch}
+          onCancelSearch={cancelSearch}
+          creating={creating}
+          createError={createError}
+          searching={searching}
+          mods={online ? activeMods : loadout}
+          timeControl={meta.presence ? (clock?.timeControl ?? null) : undefined}
+          matched={matched}
+          over={over}
         />
-      )}
-      <OnlineBar
-        meta={meta}
-        onPlayFriend={playOnline}
-        onQuickMatch={quickMatch}
-        onCancelSearch={cancelSearch}
-        creating={creating}
-        createError={createError}
-        searching={searching}
-        mods={online ? activeMods : loadout}
-        timeControl={meta.presence ? (clock?.timeControl ?? null) : undefined}
-        matched={matched}
-        over={over}
-      />
+      </div>
+      {online && landscape && <div className="area-bar-top">{bar(top)}</div>}
       <div className="stage" ref={stageRef}>
         {size > 0 && (
-          <div className="board-column" style={{ width: size }}>
-            {online && bar(top)}
-            <ModBay
-              mods={online ? activeMods : loadout}
-              editable={!online}
-              fresh={freshMod}
-              levels={
-                online
-                  ? Object.fromEntries(state.ruleset.modifiers.map((m) => [m.id, levelOf(m)]))
-                  : Object.fromEntries(loadout.map((id) => [id, playerLevel(id)]))
-              }
-              onOpenLibrary={() => {
-                setLibraryOpen(true);
-                setSettingsOpen(false);
-              }}
-              onEject={toggleMod}
-            />
+          <div className="board-column">
+            {online && !landscape && <div className="board-bar">{bar(top)}</div>}
+            {bay}
             <div ref={frameRef} className={frameClass} style={{ width: size, height: size }}>
               <GameCanvas
                 board={state.board}
@@ -315,12 +357,22 @@ export default function App() {
                 />
               )}
             </div>
-            {online && bar(bottom)}
+            {online && !landscape && <div className="board-bar">{bar(bottom)}</div>}
+            {!landscape && <div className="area-log">{log}</div>}
           </div>
         )}
       </div>
-      <ModStatusLine state={state} selected={highlights.selected} />
-      <footer className="movelog">{moves.length ? moves.join('   ') : 'Tap a piece to begin'}</footer>
+      {online && landscape && <div className="area-bar-bottom">{bar(bottom)}</div>}
+      {landscape && <div className="area-log">{log}</div>}
+      {libraryOpen && (
+        <ModLibrary
+          loadout={loadout}
+          active={activeMods}
+          editable={!online}
+          onToggle={toggleMod}
+          onClose={() => setLibraryOpen(false)}
+        />
+      )}
     </main>
   );
 }

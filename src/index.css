@@ -83,15 +83,53 @@ html, body, #root {
   user-select: none;
 }
 
+/* ── Layout ──
+   Portrait (phones, narrow windows): everything stacked, the board as wide as the screen.
+   Landscape (computers, tablets/phones on their side): the board fills the full height on
+   the left; HUD, players, mods status and the move list live in a side panel.
+   One DOM order for both (see App.tsx); --board is the board size in px. */
 .app {
   height: 100dvh;
-  max-width: 640px;
-  margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: max(12px, env(safe-area-inset-top)) 10px max(12px, env(safe-area-inset-bottom));
+  gap: 8px;
+  padding: max(8px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom))
+    max(6px, env(safe-area-inset-left));
 }
+.app.is-portrait > :not(.stage, .mod-library) { width: min(100%, max(var(--board), 340px)); align-self: center; }
+.area-top { display: flex; flex-direction: column; gap: 8px; }
+.area-log { display: flex; flex-direction: column; gap: 6px; min-height: 0; }
+
+.app.is-landscape {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(300px, 27vw, 400px);
+  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-areas: 'stage top' 'stage online' 'stage log';
+  column-gap: 20px;
+  row-gap: 10px;
+  padding: max(14px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom))
+    max(16px, env(safe-area-inset-left));
+}
+.app.is-landscape.is-online {
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  grid-template-areas: 'stage bartop' 'stage top' 'stage online' 'stage log' 'stage barbottom';
+}
+.is-landscape .stage { grid-area: stage; }
+.is-landscape .area-top { grid-area: top; }
+.is-landscape .area-online { grid-area: online; }
+.is-landscape .area-bar-top { grid-area: bartop; }
+.is-landscape .area-bar-bottom { grid-area: barbottom; }
+.is-landscape .area-log { grid-area: log; }
+
+/* Full move list in the side panel */
+.is-landscape .movelog {
+  flex: 1; min-height: 0; overflow-y: auto; text-align: left; white-space: normal;
+  display: grid; align-content: start; gap: 4px; padding: 10px 12px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+}
+.is-landscape .movelog > span { white-space: pre; }
+.is-landscape .movelog-empty { color: var(--muted); }
+.is-landscape .mod-status { justify-content: flex-start; margin-top: 0; }
 
 /* Shared panel look */
 .hud, .online-bar, .settings, .mod-library, .player-bar {
@@ -183,7 +221,8 @@ html, body, #root {
 
 /* ── Board ── */
 .stage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
-.board-column { display: flex; flex-direction: column; gap: 8px; }
+.board-column { display: flex; flex-direction: column; gap: 0; }
+.is-landscape .board-column { flex-direction: row; align-items: center; }
 .board-frame { position: relative; border-radius: var(--radius); }
 .board-canvas { display: block; touch-action: none; border-radius: var(--radius); }
 [data-theme='neonGrid'] .board-frame { box-shadow: 0 0 0 1px #22d3ee80, 0 0 28px #22d3ee33, 0 0 80px #f472d01a; }
@@ -203,9 +242,7 @@ html, body, #root {
   white-space: pre; overflow: hidden; text-overflow: ellipsis;
 }
 
-@media (min-width: 700px) {
-  .app { padding-top: 24px; padding-bottom: 24px; }
-}
+
 
 /* ── Online bar ── */
 .online-bar { display: flex; align-items: center; gap: 10px; padding: 8px 10px 8px 12px; min-height: 52px; }
@@ -498,7 +535,13 @@ html, body, #root {
 .cart-name { font: 900 13px system-ui, sans-serif; fill: #fff; letter-spacing: .03em; }
 
 /* Library panel */
-.mod-library { display: flex; flex-direction: column; gap: 12px; padding: 12px; max-height: min(70vh, 720px); overflow-y: auto; }
+.mod-library { display: flex; flex-direction: column; gap: 12px; padding: 12px; max-height: min(70vh, 720px); overflow: hidden; }
+.mod-library > .lib-head, .mod-library > .lib-tabs { flex: none; }
+.lib-scroll {
+  flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  display: flex; flex-direction: column; gap: 12px;
+  margin: 0 -12px -12px; padding: 0 12px 12px; scrollbar-gutter: stable;
+}
 .lib-head { display: flex; gap: 12px; align-items: flex-start; }
 .lib-head > div { display: flex; flex-direction: column; gap: 4px; flex: 1; }
 .lib-head strong { font-size: 15px; }
@@ -609,3 +652,47 @@ html, body, #root {
 }
 @keyframes sheet-in { from { opacity: 0; transform: translate(-50%, 12px); } }
 @media (prefers-reduced-motion: reduce) { .mod-library { animation: none; } }
+
+
+/* ── Mod bay on the board's left edge (landscape) ── */
+.bay-slot-inner { position: absolute; inset: 0; display: flex; align-items: flex-end; justify-content: center; }
+.mod-bay.is-vertical {
+  width: 72px; flex: none; flex-direction: row; gap: 0; padding: 6px 0 6px 0;
+  border: 1px solid var(--line); border-right: 0;
+  border-radius: calc(var(--radius) * 1.5) 0 0 calc(var(--radius) * 1.5);
+}
+[data-theme='nightCity'] .mod-bay.is-vertical { clip-path: polygon(var(--cut) 0, 100% 0, 100% 100%, var(--cut) 100%, 0 calc(100% - var(--cut)), 0 var(--cut)); }
+.mod-bay.is-vertical .bay-rail {
+  writing-mode: vertical-rl; transform: rotate(180deg); width: 14px; height: auto; flex: none;
+  justify-content: flex-start; padding: 2px 0;
+}
+.mod-bay.is-vertical .bay-status { margin-left: 0; margin-top: auto; }
+.mod-bay.is-vertical .bay-slots { grid-template-columns: 1fr; grid-template-rows: repeat(3, 1fr); gap: 6px; padding-right: 0; }
+.mod-bay.is-vertical .bay-slot-inner {
+  inset: auto; left: 50%; top: 50%;
+  transform: translate(-50%, -50%) rotate(-90deg);
+}
+.mod-bay.is-vertical .bay-slot.is-empty { border: 1px dashed color-mix(in srgb, var(--muted) 45%, transparent); border-right: 0; border-radius: 4px 0 0 4px; }
+.mod-bay.is-vertical .bay-slot.is-empty .bay-slot-inner { border: 0; }
+.mod-bay.is-vertical.is-powered::after {
+  left: auto; right: -1px; top: 0; bottom: 0; width: 2px; height: auto;
+  background: linear-gradient(180deg, transparent, var(--mod-color), transparent) 0 0 / 100% 40% no-repeat;
+  animation-name: trace-run-v;
+}
+@keyframes trace-run-v { from { background-position: 0 -40%; } to { background-position: 0 140%; } }
+.is-landscape .board-column > .mod-bay + .board-frame { border-radius: 0 var(--radius) var(--radius) 0; }
+/* In the side bay the cartridge is sized by the bay's depth, not the (long) slot length. */
+.mod-bay.is-vertical .bay-cart { width: auto; height: calc(100% - 6px); max-width: 100%; }
+.is-portrait .stage { align-items: flex-start; }
+/* Portrait: everything stacks from the top; spare height falls below the move log. */
+.is-portrait .board-column > .area-log { height: 56px; padding-top: 6px; gap: 4px; overflow: hidden; }
+.is-portrait .board-column > .area-log .mod-status { margin-top: 0; }
+.app.is-landscape { grid-template-columns: minmax(0, 1fr) clamp(320px, 30vw, 440px); }
+/* Cartridges are sized by the bay's depth so a big board never makes them overflow the bay. */
+.bay-cart { width: auto; height: 44px; max-width: 100%; }
+.mod-bay.is-vertical .bay-cart { height: 44px; }
+
+/* Portrait: player bars hug the board (above the bay, below the board). */
+.is-portrait .board-column { width: var(--board); }
+.board-bar { padding: 4px 0 2px; }
+.board-bar:first-child { padding-top: 0; }

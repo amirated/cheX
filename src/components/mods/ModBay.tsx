@@ -1,3 +1,4 @@
+import type { CSSProperties, ReactNode } from 'react';
 import { MAX_SLOTS, modInfo } from '../../variants/catalog';
 import { BayCartridge } from './Cartridge';
 
@@ -12,20 +13,43 @@ interface Props {
   fresh: string | null;
   /** Level each mod runs at in this game. */
   levels: Record<string, number>;
+  /** Mounted on the board's left edge (landscape) instead of its top edge (portrait). */
+  vertical?: boolean;
+  /** Board edge length in px (the bay spans it). */
+  length: number;
 }
 
+/** Depth of the bay (px) across the board edge it is mounted on. Keep in sync with CSS. */
+export const BAY_DEPTH = 72;
+const RAIL = 14;
+const GAP = 6;
+const PAD = 6;
+
 /**
- * The console's cartridge bay, mounted on the board's top edge. One slot per mod;
- * a combo game simply shows several cartridges side by side.
+ * The console's cartridge bay, mounted on the board's edge. One slot per mod; a combo
+ * game simply shows several cartridges side by side. In landscape the bay runs down the
+ * board's left edge and the cartridges turn to face the board.
  */
-export function ModBay({ mods, editable, onOpenLibrary, onEject, fresh, levels }: Props) {
+export function ModBay({ mods, editable, onOpenLibrary, onEject, fresh, levels, vertical = false, length }: Props) {
   const slots = Array.from({ length: MAX_SLOTS }, (_, i) => mods[i] ?? null);
   const loaded = mods.length;
+  // In vertical mode each slot's contents are laid out horizontally, then rotated.
+  const slotLen = (length - PAD * 2 - GAP * (MAX_SLOTS - 1)) / MAX_SLOTS;
+  const inner: CSSProperties | undefined = vertical ? { width: slotLen, height: BAY_DEPTH - RAIL - PAD } : undefined;
+  const wrap = (content: ReactNode) => (
+    <span className="bay-slot-inner" style={inner}>
+      {content}
+    </span>
+  );
+
   return (
     <div
-      className={`mod-bay${loaded ? ' is-powered' : ''}`}
+      className={`mod-bay${loaded ? ' is-powered' : ''}${vertical ? ' is-vertical' : ''}`}
       aria-label="Mod bay"
-      style={{ ['--mod-color' as string]: modInfo(mods[0] ?? '')?.shell ?? 'var(--accent)' }}
+      style={{
+        ['--mod-color' as string]: modInfo(mods[0] ?? '')?.shell ?? 'var(--accent)',
+        ...(vertical ? { height: length } : {}),
+      }}
     >
       <div className="bay-rail">
         <span className="bay-title">MOD BAY</span>
@@ -57,8 +81,12 @@ export function ModBay({ mods, editable, onOpenLibrary, onEject, fresh, levels }
                 aria-label={editable ? `Eject ${mod.name}` : `${mod.name} is active`}
                 title={editable ? `Eject ${mod.name}` : mod.name}
               >
-                <BayCartridge mod={mod} level={levels[mod.id] ?? 1} />
-                <span className="bay-port" />
+                {wrap(
+                  <>
+                    <BayCartridge mod={mod} level={levels[mod.id] ?? 1} />
+                    <span className="bay-port" />
+                  </>,
+                )}
               </button>
             );
           }
@@ -71,8 +99,12 @@ export function ModBay({ mods, editable, onOpenLibrary, onEject, fresh, levels }
               onClick={onOpenLibrary}
               aria-label={editable ? 'Empty slot: open the mod library' : 'Empty slot'}
             >
-              <span className="bay-empty-label">{editable ? '+ MOD' : `SLOT ${i + 1}`}</span>
-              <span className="bay-port" />
+              {wrap(
+                <>
+                  <span className="bay-empty-label">{editable ? '+ MOD' : `SLOT ${i + 1}`}</span>
+                  <span className="bay-port" />
+                </>,
+              )}
             </button>
           );
         })}
