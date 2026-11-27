@@ -24,6 +24,12 @@ Without `?room=`, the game runs fully offline as local pass-and-play, exactly as
 - The board takes the largest whole-pixel size that fits (`useBoardSize`). Both layouts share one DOM order and CSS grid areas place the pieces, so rotating a device never reloads the board.
 - **Fullscreen:** the corner button in the header, or the F key (Esc to leave), with the screen kept awake while fullscreen. iPhone Safari has no fullscreen button; there, "Add to Home Screen" opens CheX as a full-screen app (`public/manifest.webmanifest`).
 
+## Captured pieces, move review and online feel
+
+- **Captured pieces** sit next to the side that took them, with a `+N` material lead: rows above and below the board in portrait, a column beside it in landscape (`CapturedTray`, drawn with the board's own piece shapes via `PieceIcon`).
+- **Move review:** the arrows under the board (portrait) or above the move list (landscape), the ← → / Home / End keys, or a click on any move in the landscape list. Positions are rebuilt from the move history (`engine/replay.ts`). A new ply, such as the opponent moving, returns the board to the live position in the same frame. Tapping the board while reviewing also returns to live.
+- **Optimistic moves online:** `SocketTransport` plays your move through the same reducer the server runs as soon as you make it (clock included), so nothing waits on the network. The server's confirmation replaces that state silently. If the server refuses the move, the board rolls back and resyncs.
+
 ## Themes
 
 There are two cyber themes, **Neon grid** and **Night city** (the default), and each can show pieces **filled** or as **outlines**. Players pick these in the settings panel (the sliders icon in the header). The choice is saved per device in `localStorage` and never sent to the server, so each player sees their own look.

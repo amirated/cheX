@@ -127,7 +127,7 @@ html, body, #root {
   display: grid; align-content: start; gap: 4px; padding: 10px 12px;
   background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
 }
-.is-landscape .movelog > span { white-space: pre; }
+.is-landscape .movelog > .move-row { display: grid; grid-template-columns: 2.4em 1fr 1fr; align-items: center; gap: 4px; }
 .is-landscape .movelog-empty { color: var(--muted); }
 .is-landscape .mod-status { justify-content: flex-start; margin-top: 0; }
 
@@ -685,7 +685,7 @@ html, body, #root {
 .mod-bay.is-vertical .bay-cart { width: auto; height: calc(100% - 6px); max-width: 100%; }
 .is-portrait .stage { align-items: flex-start; }
 /* Portrait: everything stacks from the top; spare height falls below the move log. */
-.is-portrait .board-column > .area-log { height: 56px; padding-top: 6px; gap: 4px; overflow: hidden; }
+.is-portrait .board-column > .area-log { height: 72px; padding-top: 6px; gap: 4px; overflow: hidden; justify-content: flex-start; }
 .is-portrait .board-column > .area-log .mod-status { margin-top: 0; }
 .app.is-landscape { grid-template-columns: minmax(0, 1fr) clamp(320px, 30vw, 440px); }
 /* Cartridges are sized by the bay's depth so a big board never makes them overflow the bay. */
@@ -696,3 +696,86 @@ html, body, #root {
 .is-portrait .board-column { width: var(--board); }
 .board-bar { padding: 4px 0 2px; }
 .board-bar:first-child { padding-top: 0; }
+
+
+/* ── Captured pieces ── */
+.captured {
+  display: flex; align-items: center; gap: 6px;
+  min-height: var(--icon); color: var(--muted);
+}
+.captured.is-row { height: 30px; /* = TRAY_ROW_PX */ padding: 0 2px; }
+.captured.is-row.is-end { justify-content: flex-end; }
+.captured.is-column { flex-direction: column; flex: 1; min-height: 0; width: 100%; }
+.captured.is-column.is-end { justify-content: flex-end; }
+.captured-group { display: inline-flex; }
+.captured.is-column .captured-group { flex-direction: column; }
+/* Same kinds overlap so a full set of pawns stays compact. */
+.captured.is-row .captured-piece + .captured-piece { margin-left: calc(var(--icon) * -0.48); }
+.captured.is-column .captured-piece + .captured-piece { margin-top: calc(var(--icon) * -0.48); }
+.captured-piece { display: inline-flex; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .6)); animation: taken-in .42s cubic-bezier(.2, 1.5, .4, 1) both; }
+@keyframes taken-in { from { transform: scale(.2) rotate(-25deg); opacity: 0; } }
+.captured-lead { font: 800 12px var(--font-num); color: var(--accent); font-variant-numeric: tabular-nums; animation: taken-in .3s ease-out both; }
+.captured-col {
+  width: 40px; /* = TRAY_COL_PX */ height: var(--board);
+  display: flex; flex-direction: column; justify-content: space-between; align-items: center;
+  padding: 4px 0; gap: 8px;
+}
+
+/* ── Move navigation ── */
+.move-nav { display: flex; align-items: center; gap: 4px; }
+.move-nav-mid { flex: 1; min-width: 0; display: flex; justify-content: center; }
+.move-nav-mid > .movelog { flex: 1; min-width: 0; }
+.move-nav-label { font: 700 12px var(--font-num); color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
+.move-nav.is-reviewing .move-nav-label { color: var(--accent); }
+.nav-btn {
+  flex: none; width: 34px; height: 30px; display: grid; place-items: center;
+  background: var(--panel); color: var(--ink, #fff); border: 1px solid var(--line); border-radius: var(--radius);
+  cursor: pointer; transition: background-color .15s, color .15s, transform .1s, opacity .15s;
+}
+.nav-btn:active:not(:disabled) { transform: scale(.92); }
+.nav-btn:disabled { opacity: .3; cursor: default; }
+.nav-btn.is-live-cta { color: var(--accent); border-color: var(--accent); }
+.is-portrait .move-nav .movelog { white-space: nowrap; }
+.move-nav.is-reviewing .movelog { color: var(--accent); }
+
+.ply {
+  justify-self: start; padding: 2px 6px; border: 0; border-radius: 3px; background: transparent;
+  font: inherit; color: inherit; cursor: pointer; white-space: pre; transition: background-color .12s, color .12s;
+}
+.ply:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.ply.is-current { background: var(--accent); color: var(--accent-ink, #000); }
+.move-no { color: var(--muted); }
+
+/* Reviewing an earlier position: the board says so, and one tap goes back to live. */
+.board-frame.is-reviewing { box-shadow: 0 0 0 2px color-mix(in srgb, var(--muted) 70%, transparent); }
+.review-chip {
+  position: absolute; left: 50%; top: 8px; z-index: 6; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 10px; padding: 6px 8px 6px 12px;
+  background: rgba(10, 10, 16, .88); color: #fff; border: 1px solid var(--accent); border-radius: 999px;
+  font: 600 12px var(--font-num); white-space: nowrap; cursor: pointer;
+  backdrop-filter: blur(4px); animation: chip-in .22s ease-out both;
+}
+.review-chip strong { background: var(--accent); color: var(--accent-ink, #000); padding: 3px 8px; border-radius: 999px; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; }
+@keyframes chip-in { from { opacity: 0; transform: translate(-50%, -8px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .captured-piece, .captured-lead, .review-chip { animation: none; }
+}
+
+/* ── Transitions ── */
+/* A bar that changes what it shows (idle → time controls → searching) slides its new content in;
+   AutoHeight (components/AutoHeight.tsx) animates the height change around it. */
+.is-swap > * { animation: swap-in .32s cubic-bezier(.2, .8, .2, 1) both; }
+.is-swap > :nth-child(2) { animation-delay: .04s; }
+.is-swap > :nth-child(3) { animation-delay: .08s; }
+.tc-option { animation: option-in .34s cubic-bezier(.2, 1.3, .4, 1) both; animation-delay: calc(.06s + var(--i, 0) * .035s); }
+.tc-footer { animation: swap-in .3s ease-out .26s both; }
+@keyframes swap-in { from { opacity: 0; transform: translateY(-6px); } }
+@keyframes option-in { from { opacity: 0; transform: translateY(8px) scale(.94); } }
+.settings { animation: panel-down .24s cubic-bezier(.2, .8, .2, 1) both; transform-origin: top center; }
+@keyframes panel-down { from { opacity: 0; transform: translateY(-8px) scaleY(.96); } }
+.lib-scroll > * { animation: swap-in .26s ease-out both; }
+.player-bar { animation: swap-in .3s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .is-swap > *, .tc-option, .tc-footer, .settings, .lib-scroll > *, .player-bar { animation: none; }
+}

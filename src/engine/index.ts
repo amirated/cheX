@@ -12,3 +12,4 @@ export type { PieceDefinition, MovementRule } from './pieces/types';
 export { registerSpecialMove } from './rules/specialRegistry';
 export { registerRuleModifier } from './rules/modifiers';
 export { registerTileModifier } from './tiles';
+export * from './replay';

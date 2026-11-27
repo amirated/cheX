@@ -22,8 +22,15 @@ export function TimeControlPicker({ busy, onPick, onCancel }: Props) {
   return (
     <div className="tc-picker" role="group" aria-label="Choose a time control">
       <div className="tc-grid">
-        {PRESETS.map((p) => (
-          <button key={p.label} type="button" className="tc-option" disabled={busy} onClick={() => onPick(p.tc)}>
+        {PRESETS.map((p, i) => (
+          <button
+            key={p.label}
+            type="button"
+            className="tc-option"
+            style={{ ['--i' as string]: i }}
+            disabled={busy}
+            onClick={() => onPick(p.tc)}
+          >
             <strong>{p.label}</strong>
             <span>{p.family}</span>
           </button>
@@ -32,7 +39,7 @@ export function TimeControlPicker({ busy, onPick, onCancel }: Props) {
 
       {custom ? (
         <form
-          className="tc-custom"
+          className="tc-custom is-swap"
           onSubmit={(e) => {
             e.preventDefault();
             if (customValid) onPick({ initialMs: Math.round(m * 60_000), incrementMs: inc * 1000 });

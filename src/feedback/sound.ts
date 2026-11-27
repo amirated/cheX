@@ -81,7 +81,7 @@ interface ToneOpts {
   cutoff?: number;
 }
 
-function tone(c: AudioContext, out: AudioNode, o: ToneOpts) {
+function tone(c: BaseAudioContext, out: AudioNode, o: ToneOpts) {
   const t0 = c.currentTime + (o.at ?? 0);
   const osc = c.createOscillator();
   osc.type = o.type ?? 'sine';
@@ -115,16 +115,18 @@ interface NoiseOpts {
   q?: number;
   /** Sweep the band to this frequency over the duration. */
   to?: number;
+  /** 'highpass' keeps only the bright top: a dry tick with no body. Default 'bandpass'. */
+  filter?: BiquadFilterType;
 }
 
-function noise(c: AudioContext, out: AudioNode, o: NoiseOpts) {
+function noise(c: BaseAudioContext, out: AudioNode, o: NoiseOpts) {
   if (!noiseBuf) return;
   const t0 = c.currentTime + (o.at ?? 0);
   const src = c.createBufferSource();
   src.buffer = noiseBuf;
   src.loop = true;
   const f = c.createBiquadFilter();
-  f.type = 'bandpass';
+  f.type = o.filter ?? 'bandpass';
   f.frequency.setValueAtTime(o.freq, t0);
   if (o.to) f.frequency.exponentialRampToValueAtTime(o.to, t0 + o.dur);
   f.Q.value = o.q ?? 1.2;
@@ -140,27 +142,43 @@ const note = (semitonesFromA4: number) => 440 * Math.pow(2, semitonesFromA4 / 12
 
 // ───────────────────────────── the sounds ─────────────────────────────
 
-function thock(c: AudioContext, out: AudioNode, at = 0, weight = 1) {
-  // A piece landing: a short filtered click on top of a low body thump.
-  noise(c, out, { at, dur: 0.045, freq: 2400, q: 0.9, gain: 0.45 * weight });
-  tone(c, out, { at, freq: 190 * (flavour === 'synth' ? 1.15 : 1), to: 90, dur: 0.11, gain: 0.5 * weight });
+/**
+ * A piece landing: crisp, wooden "tok". Short and bright on purpose: a dry high-passed
+ * transient, a quickly decaying mid "wood" partial (plus its inharmonic overtone), and only
+ * a 30 ms hint of low body, so it never smears into mud on small speakers.
+ */
+function tok(c: BaseAudioContext, out: AudioNode, at = 0, weight = 1, pitch = 1) {
+  const p = pitch * (flavour === 'synth' ? 1.12 : 1);
+  noise(c, out, { at, dur: 0.014, freq: 3200, filter: 'highpass', q: 0.7, gain: 0.55 * weight });
+  tone(c, out, { at, freq: 1180 * p, to: 940 * p, dur: 0.07, gain: 0.32 * weight, attack: 0.001 });
+  tone(c, out, { at, freq: 2950 * p, dur: 0.022, gain: 0.08 * weight, attack: 0.001 });
+  tone(c, out, { at, freq: 340 * p, to: 260 * p, dur: 0.03, gain: 0.16 * weight, attack: 0.001 });
 }
 
-const SOUNDS: Record<SoundName, (c: AudioContext, out: AudioNode) => void> = {
+/** Piece strikes piece: a hard double "clack", a bright snap and a short glassy sparkle. */
+function clack(c: BaseAudioContext, out: AudioNode) {
+  const p = flavour === 'synth' ? 1.1 : 1;
+  noise(c, out, { dur: 0.012, freq: 4200, filter: 'highpass', q: 0.7, gain: 0.7 });
+  tone(c, out, { freq: 1650 * p, to: 1250 * p, dur: 0.045, gain: 0.3, attack: 0.001 });
+  tone(c, out, { freq: 3900 * p, dur: 0.02, gain: 0.08, attack: 0.001 });
+  // the captured piece knocked aside a beat later
+  noise(c, out, { at: 0.028, dur: 0.012, freq: 3000, filter: 'highpass', q: 0.7, gain: 0.5 });
+  tone(c, out, { at: 0.028, freq: 1320 * p, to: 990 * p, dur: 0.06, gain: 0.26, attack: 0.001 });
+  tone(c, out, { at: 0.028, freq: 420 * p, to: 300 * p, dur: 0.035, gain: 0.14, attack: 0.001 });
+  // bright shatter tail
+  noise(c, out, { at: 0.03, dur: 0.11, freq: 7500, filter: 'highpass', q: 0.7, gain: 0.12 });
+  tone(c, out, { at: 0.04, freq: note(31) * p, to: note(26) * p, dur: 0.09, gain: 0.035, type: 'triangle', attack: 0.001 });
+}
+
+const SOUNDS: Record<SoundName, (c: BaseAudioContext, out: AudioNode) => void> = {
   select: (c, o) => tone(c, o, { freq: 1900, dur: 0.03, gain: 0.07, type: 'sine' }),
-  move: (c, o) => thock(c, o),
-  opponentMove: (c, o) => {
-    thock(c, o, 0, 0.9);
-    tone(c, o, { freq: flavour === 'synth' ? 660 : 520, dur: 0.09, gain: 0.05, type: 'triangle', at: 0.01 });
-  },
-  capture: (c, o) => {
-    noise(c, o, { dur: 0.16, freq: 1800, to: 500, q: 0.8, gain: 0.7 });
-    tone(c, o, { freq: 320, to: 70, dur: 0.18, gain: 0.55, type: flavour === 'synth' ? 'square' : 'triangle', cutoff: 1400 });
-    noise(c, o, { at: 0.02, dur: 0.05, freq: 5000, q: 2, gain: 0.25 });
-  },
+  move: (c, o) => tok(c, o),
+  // Same tok a fourth lower: you can tell their move from yours without looking.
+  opponentMove: (c, o) => tok(c, o, 0, 1, 0.78),
+  capture: (c, o) => clack(c, o),
   castle: (c, o) => {
-    thock(c, o, 0, 0.9);
-    thock(c, o, 0.09, 0.8);
+    tok(c, o, 0, 0.9);
+    tok(c, o, 0.085, 0.85, 1.12);
   },
   check: (c, o) => {
     const type: OscillatorType = flavour === 'synth' ? 'square' : 'sawtooth';
@@ -227,7 +245,7 @@ const LEVEL: Record<SoundName, number> = {
   move: 3.2,
   opponentMove: 3.4,
   capture: 3.4,
-  castle: 1.4,
+  castle: 1.2,
   check: 3,
   promote: 3,
   illegal: 5,
@@ -241,6 +259,15 @@ const LEVEL: Record<SoundName, number> = {
   eject: 3,
   enhance: 3,
 };
+
+/** Render one sound into any context (offline loudness checks in tests/tools). */
+export function renderSound(c: BaseAudioContext, out: AudioNode, name: SoundName) {
+  context(); // the shared noise buffer
+  const trim = c.createGain();
+  trim.gain.value = LEVEL[name];
+  trim.connect(out);
+  SOUNDS[name](c, trim);
+}
 
 export function playSound(name: SoundName) {
   if (!enabled) return;

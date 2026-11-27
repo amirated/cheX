@@ -31,6 +31,11 @@ import { ModStatusLine } from './components/mods/ModStatusLine';
 import { pieceModStatus } from './engine/rules/modifiers';
 import { levelOf } from './engine/rules/charges';
 import { playerLevel } from './variants/progression';
+import { useReview } from './hooks/useReview';
+import { AutoHeight } from './components/AutoHeight';
+import { MoveNav } from './components/MoveNav';
+import { CapturedTray } from './components/CapturedTray';
+import { materialOf } from './engine/replay';
 
 /** `?room=CODE` → online game against the Rust server; otherwise local pass-and-play.
  *  Created once at module scope so React StrictMode's double-mount can't open two sockets. */
@@ -60,17 +65,24 @@ const initialQuick = quickParam();
 if (initialQuick !== undefined) history.replaceState(null, '', location.pathname);
 let quickStarted = false;
 
+const NO_PIPS: Record<string, PipInfo> = {};
+
 /** Gap between the mod bay and the board (keep in sync with .board-column in index.css). */
 const BAY_GAP = 0;
 /** Height of a player bar plus its gap, when bars sit above/below the board in portrait. */
 const PLAYER_BAR_PX = 46;
-/** Portrait: room kept under the board for the mod status line and the move log. */
-const PORTRAIT_LOG_PX = 56;
+/** Portrait: room kept under the board for the mod status line and the move log + arrows. */
+const PORTRAIT_LOG_PX = 72;
+/** Captured-piece trays: a row above and below the board (portrait), a column beside it (landscape). */
+const TRAY_ROW_PX = 30;
+const TRAY_COL_PX = 40;
+const TRAY_ICON = { portrait: 26, landscape: 32 } as const;
 
 export default function App() {
   const { state, meta, myTurn, highlights, onSquare, reset, resign, sanLog } = useChessGame(transport);
   const clock = useClock(transport);
   const fx = useGameFeedback(state, meta, clock);
+  const review = useReview(state);
   const [dismissed, setDismissed] = useState<number | null>(null);
   const frameRef = useRef<HTMLDivElement>(null);
 
@@ -98,7 +110,9 @@ export default function App() {
   // mod bay sits on the board's top edge (portrait) or left edge (landscape).
   const size = useBoardSize(
     stageRef,
-    landscape ? { x: BAY_DEPTH + BAY_GAP } : { y: BAY_DEPTH + BAY_GAP + PORTRAIT_LOG_PX + (online ? PLAYER_BAR_PX * 2 : 0) },
+    landscape
+      ? { x: BAY_DEPTH + BAY_GAP + TRAY_COL_PX }
+      : { y: BAY_DEPTH + BAY_GAP + PORTRAIT_LOG_PX + TRAY_ROW_PX * 2 + (online ? PLAYER_BAR_PX * 2 : 0) },
     layout,
   );
 
@@ -177,20 +191,39 @@ export default function App() {
     }
   };
 
-  // Pair plies into "1. e4 e5" and show the most recent few.
+  // ◆ marks a move that used a mod charge.
+  const plySan = useMemo(
+    () => sanLog.map((san, i) => `${san}${state.history[i]?.flags.some((f) => f.startsWith('mod:')) ? '◆' : ''}`),
+    [sanLog, state.history],
+  );
+  // Pair plies into "1. e4 e5" (portrait shows the most recent few).
   const moves = useMemo(() => {
     const rows: string[] = [];
-    // ◆ marks a move that used a mod charge.
-    const mark = (i: number) => (state.history[i]?.flags.some((f) => f.startsWith('mod:')) ? '◆' : '');
-    const san = (i: number) => `${sanLog[i]}${mark(i)}`;
-    for (let i = 0; i < sanLog.length; i += 2) rows.push(`${i / 2 + 1}. ${san(i)}${sanLog[i + 1] ? ' ' + san(i + 1) : ''}`);
+    for (let i = 0; i < plySan.length; i += 2) rows.push(`${i / 2 + 1}. ${plySan[i]}${plySan[i + 1] ? ' ' + plySan[i + 1] : ''}`);
     return rows;
-  }, [sanLog, state.history]);
-  // Keep the newest move in view when the full log scrolls (landscape).
+  }, [plySan]);
+  // Keep the newest move in view when the full log scrolls (landscape); while reviewing, the viewed one.
   const logRef = useRef<HTMLElement>(null);
   useEffect(() => {
-    logRef.current?.scrollTo({ top: logRef.current.scrollHeight });
-  }, [moves.length]);
+    const el = logRef.current;
+    if (!el) return;
+    const current = el.querySelector<HTMLElement>('.ply.is-current');
+    if (review.reviewing && current) current.scrollIntoView({ block: 'nearest' });
+    else el.scrollTo({ top: el.scrollHeight });
+  }, [moves.length, review.ply, review.reviewing]);
+
+  // Static highlights for a reviewed position: just the move that led to it.
+  const reviewHighlights = useMemo(
+    () => ({
+      lastMove: review.lastMove ? { from: review.lastMove.from, to: review.lastMove.to } : null,
+      selected: null,
+      quietTargets: [],
+      captureTargets: [],
+      checkSquare: null,
+      modTargets: [],
+    }),
+    [review.lastMove],
+  );
 
   // You at the bottom; spectators see White at the bottom.
   const bottom: Color = meta.seat ?? 'white';
@@ -202,8 +235,9 @@ export default function App() {
   const frameClass = [
     'board-frame',
     online && meta.seat && myTurn && !over ? 'is-your-turn' : '',
-    state.status === 'check' ? 'is-check' : '',
-    state.status === 'checkmate' ? 'is-mate' : '',
+    state.status === 'check' && !review.reviewing ? 'is-check' : '',
+    state.status === 'checkmate' && !review.reviewing ? 'is-mate' : '',
+    review.reviewing ? 'is-reviewing' : '',
   ].filter(Boolean).join(' ');
 
   const bar = (color: Color) => {
@@ -284,20 +318,73 @@ export default function App() {
   // One DOM order for both layouts; CSS grid areas place the pieces (see .app in index.css),
   // so switching orientation never remounts the board canvas.
   // Move log + mod status: the side column in landscape, right under the board in portrait.
+  const moveText = (() => {
+    if (moves.length === 0) return <span className="movelog-empty">Tap a piece to begin</span>;
+    if (landscape) {
+      return moves.map((_, r) => (
+        <span key={r} className="move-row">
+          <span className="move-no">{r + 1}.</span>
+          {[2 * r, 2 * r + 1].map((i) =>
+            i < plySan.length ? (
+              <button
+                key={i}
+                type="button"
+                className={`ply${review.ply === i + 1 ? ' is-current' : ''}`}
+                onClick={() => review.go(i + 1)}
+              >
+                {plySan[i]}
+              </button>
+            ) : null,
+          )}
+        </span>
+      ));
+    }
+    if (review.reviewing) {
+      const i = review.ply - 1;
+      return i < 0 ? 'Start position' : `${Math.floor(i / 2) + 1}.${i % 2 ? '..' : ''} ${plySan[i]}   · ${review.ply}/${review.live}`;
+    }
+    return moves.slice(-3).join('   ');
+  })();
+
+  // Move log + mod status: the side column in landscape, right under the board in portrait.
   const log = (
     <>
-      <ModStatusLine state={state} selected={highlights.selected} />
-      <footer className="movelog" ref={logRef}>
-        {moves.length === 0 ? (
-          <span className="movelog-empty">Tap a piece to begin</span>
-        ) : landscape ? (
-          moves.map((row) => <span key={row}>{row}</span>)
-        ) : (
-          moves.slice(-4).join('   ')
-        )}
-      </footer>
+      {!review.reviewing && <ModStatusLine state={state} selected={highlights.selected} />}
+      {landscape ? (
+        <>
+          <MoveNav review={review}>
+            <span className="move-nav-label">{review.reviewing ? `Move ${review.ply} of ${review.live}` : 'Live'}</span>
+          </MoveNav>
+          <footer className="movelog" ref={logRef}>
+            {moveText}
+          </footer>
+        </>
+      ) : (
+        <MoveNav review={review}>
+          <footer className="movelog" ref={logRef}>
+            {moveText}
+          </footer>
+        </MoveNav>
+      )}
     </>
   );
+
+  // Captured pieces: each side's haul sits next to that side (top player's above/right-top).
+  const tray = (color: Color, align: 'start' | 'end') => {
+    const other: Color = color === 'white' ? 'black' : 'white';
+    const mat = (c: Color) => materialOf(Object.values(review.board.pieces).filter((p) => p.color === c));
+    return (
+      <CapturedTray
+        pieces={review.captures[color]}
+        look={THEMES[prefs.theme].pieces[prefs.pieceStyle][other]}
+        lead={mat(color) - mat(other)}
+        direction={landscape ? 'column' : 'row'}
+        align={align}
+        label={`Taken by ${color === meta.seat ? 'you' : meta.seat ? 'opponent' : color}`}
+        iconSize={TRAY_ICON[layout]}
+      />
+    );
+  };
 
   return (
     <main className={`app is-${layout}${online ? ' is-online' : ''}`} style={{ ['--board' as string]: `${size}px` }}>
@@ -305,7 +392,7 @@ export default function App() {
         {hud}
         {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
       </div>
-      <div className="area-online">
+      <AutoHeight className="area-online">
         <OnlineBar
           meta={meta}
           onPlayFriend={playOnline}
@@ -319,23 +406,24 @@ export default function App() {
           matched={matched}
           over={over}
         />
-      </div>
+      </AutoHeight>
       {online && landscape && <div className="area-bar-top">{bar(top)}</div>}
       <div className="stage" ref={stageRef}>
         {size > 0 && (
           <div className="board-column">
             {online && !landscape && <div className="board-bar">{bar(top)}</div>}
+            {!landscape && tray(top, 'start')}
             {bay}
             <div ref={frameRef} className={frameClass} style={{ width: size, height: size }}>
               <GameCanvas
-                board={state.board}
+                board={review.board}
                 size={size}
-                highlights={highlights}
-                onSquare={onSquare}
+                highlights={review.reviewing ? reviewHighlights : highlights}
+                onSquare={review.reviewing ? review.toLive : onSquare}
                 flipped={meta.seat === 'black'}
                 theme={THEMES[prefs.theme]}
                 pieceStyle={prefs.pieceStyle}
-                pips={pips}
+                pips={review.reviewing ? NO_PIPS : pips}
               />
               <BoardFx
                 size={size}
@@ -343,10 +431,18 @@ export default function App() {
                 ranks={state.board.height}
                 flipped={meta.seat === 'black'}
                 bursts={fx.bursts}
-                checkSquare={highlights.checkSquare}
-                mate={state.status === 'checkmate'}
+                checkSquare={review.reviewing ? null : highlights.checkSquare}
+                mate={state.status === 'checkmate' && !review.reviewing}
               />
-              {showOver && (
+              {review.reviewing && (
+                <button type="button" className="review-chip" onClick={review.toLive}>
+                  <span>
+                    {review.ply === 0 ? 'Start position' : `Move ${Math.ceil(review.ply / 2)}${review.ply % 2 ? '' : '…'} ${sanLog[review.ply - 1] ?? ''}`}
+                  </span>
+                  <strong>Back to live</strong>
+                </button>
+              )}
+              {showOver && !review.reviewing && (
                 <GameOverOverlay
                   key={showOver.seq}
                   info={showOver}
@@ -357,6 +453,14 @@ export default function App() {
                 />
               )}
             </div>
+            {landscape ? (
+              <div className="captured-col">
+                {tray(top, 'start')}
+                {tray(bottom, 'end')}
+              </div>
+            ) : (
+              tray(bottom, 'start')
+            )}
             {online && !landscape && <div className="board-bar">{bar(bottom)}</div>}
             {!landscape && <div className="area-log">{log}</div>}
           </div>

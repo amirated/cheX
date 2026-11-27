@@ -171,3 +171,25 @@ import { withUse } from '../src/engine/rules/charges';
 function withModsState(f: string): GameState {
   return { ...fen(f), ruleset: rulesetFor(['knightCamel']) };
 }
+
+describe('replayGame (move review + captured pieces)', () => {
+  it('rebuilds every position and tracks captures by the side that took them', async () => {
+    const { replayGame, materialOf } = await import('../src/engine/replay');
+    let s = createGameState();
+    const play = (from: string, to: string) => {
+      const sq = (x: string) => ({ file: x.charCodeAt(0) - 97, rank: Number(x[1]) - 1 });
+      s = gameReducer(s, { type: 'move', from: sq(from), to: sq(to) });
+    };
+    play('e2', 'e4'); play('d7', 'd5'); play('e4', 'd5'); play('d8', 'd5');
+    const r = replayGame(s);
+    expect(r.ok).toBe(true);
+    expect(r.boards).toHaveLength(5);
+    expect(r.boards[4].squares).toEqual(s.board.squares);
+    expect(r.captures[2]).toEqual({ white: [], black: [] });
+    expect(r.captures[3].white.map((p) => p.kind)).toEqual(['pawn']);
+    expect(r.captures[4].black.map((p) => p.kind)).toEqual(['pawn']);
+    expect(materialOf(r.captures[4].white)).toBe(1);
+    // position 1 has the e-pawn on e4 and nothing taken
+    expect(Object.keys(r.boards[1].pieces)).toHaveLength(32);
+  });
+});
