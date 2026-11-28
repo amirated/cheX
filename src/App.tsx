@@ -133,7 +133,9 @@ export default function App() {
   /** Plug a cartridge in or eject it. Locally that restarts the game with the new rules. */
   const toggleMod = (id: string) => {
     const plugging = !loadout.includes(id);
-    const next = plugging ? [...loadout, id] : loadout.filter((m) => m !== id);
+    // A piece has one slot: plugging a mod in replaces whatever that slot held.
+    const piece = modInfo(id)?.piece;
+    const next = plugging ? [...loadout.filter((m) => modInfo(m)?.piece !== piece), id] : loadout.filter((m) => m !== id);
     if (!online) {
       const midGame = state.ply > 0 && !['checkmate', 'stalemate', 'draw', 'timeout', 'resigned'].includes(state.status);
       if (midGame && !window.confirm('Changing mods starts a new game. Continue?')) return;

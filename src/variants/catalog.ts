@@ -65,9 +65,106 @@ export const MODS: ModInfo[] = [
     shell: '#ff9f1c',
     status: 'experimental',
   },
+  {
+    id: 'pawnRam',
+    code: 'PR-01',
+    name: 'Battering Ram',
+    ability: 'Ram',
+    tagline: 'Pawns punch straight ahead.',
+    description:
+      'Every pawn keeps its usual moves and gains one more: it can capture the enemy piece standing directly in front of it. Two pawns locked nose to nose are no longer stuck.',
+    rules: [
+      'Pawns move as normal, or ram: capture the enemy piece directly in front of them, one square straight ahead.',
+      'Each pawn has as many rams as your level: one at level 1, up to three at level 3. Normal pawn moves are always free.',
+      'After a ram the pawn cools down: it skips one of your turns before it can ram again.',
+      'A ram only captures, one square ahead. Stepping forward onto an empty square, the two-square first move and en passant work as in classic chess.',
+      'A pawn that can ram on its next move threatens the square in front of it: it gives check to a king standing there, and the enemy king cannot step there. A spent or cooling pawn only threatens diagonally.',
+      'Ramming onto the last rank promotes, like any pawn move.',
+    ],
+    piece: 'pawn',
+    diagram: { base: [v(0, 1), v(-1, 1), v(1, 1)], added: [v(0, 1)] },
+    lab: [
+      { label: 'Draws', value: '16% → 16%' },
+      { label: 'Game length', value: '5 plies shorter' },
+      { label: 'Colour balance', value: 'unchanged' },
+      { label: 'Verdict', value: 'a light touch, even unlimited' },
+    ],
+    shell: '#ff4d8d',
+    status: 'experimental',
+  },
+  {
+    id: 'rookSlip',
+    code: 'RS-01',
+    name: 'Slipping Rook',
+    ability: 'Slip',
+    tagline: 'Rooks slip out of the corner.',
+    description:
+      'Every rook keeps its straight lines and gains one small move: a single step diagonally. It gets a boxed-in rook out of the corner before the files open, or sidesteps onto a better file.',
+    rules: [
+      'Rooks move as normal, or slip: one step diagonally, to an empty square or onto an enemy piece.',
+      'Each rook has as many slips as your level: one at level 1, up to three at level 3. Normal rook moves are always free.',
+      'After a slip the rook cools down: it skips one of your turns before it can slip again.',
+      'A rook that can slip on its next move threatens its four diagonal neighbours: it gives check and pins like any move. A spent or cooling rook only threatens along its lines.',
+      'A slip counts as moving the rook, so that rook can no longer castle.',
+      'Everything else is classic chess.',
+    ],
+    piece: 'rook',
+    diagram: { base: [v(0, 1), v(0, 2), v(0, 3), v(0, -1), v(0, -2), v(0, -3), v(1, 0), v(2, 0), v(3, 0), v(-1, 0), v(-2, 0), v(-3, 0)], added: ring(1, 1) },
+    lab: [
+      { label: 'Rook worth', value: '≈ 5.5 pawns (was ≈ 4)' },
+      { label: 'Draws', value: '16% → 15%' },
+      { label: 'Game length', value: '12 plies shorter' },
+      { label: 'Colour balance', value: 'unchanged' },
+    ],
+    shell: '#3ddc97',
+    status: 'experimental',
+  },
+  {
+    id: 'bishopShift',
+    code: 'BS-01',
+    name: 'Shifting Bishop',
+    ability: 'Shift',
+    tagline: 'Bishops cross to the other colour.',
+    description:
+      'Every bishop keeps its diagonals and gains one step straight up, down or sideways. That step lands on the other square colour, so a bishop is no longer stuck on the squares it started on.',
+    rules: [
+      'Bishops move as normal, or shift: one step up, down, left or right, to an empty square or onto an enemy piece.',
+      'Each bishop has as many shifts as your level: one at level 1, up to three at level 3. Normal bishop moves are always free.',
+      'After a shift the bishop cools down: it skips one of your turns before it can shift again.',
+      'A shift changes the bishop’s square colour, so two bishops can end up on the same colour.',
+      'A bishop that can shift on its next move threatens its four orthogonal neighbours: it gives check and pins like any move. A spent or cooling bishop only threatens diagonally.',
+      'Everything else is classic chess.',
+    ],
+    piece: 'bishop',
+    diagram: { base: [1, 2, 3].flatMap((d) => [v(d, d), v(-d, d), v(d, -d), v(-d, -d)]), added: [v(0, 1), v(0, -1), v(1, 0), v(-1, 0)] },
+    lab: [
+      { label: 'Bishop worth', value: '≈ 4.9 pawns (was ≈ 2.5)' },
+      { label: 'Draws', value: '16% → 12%' },
+      { label: 'Game length', value: '11 plies shorter' },
+      { label: 'Colour balance', value: 'slight White edge' },
+    ],
+    shell: '#9b7bff',
+    status: 'experimental',
+  },
 ];
 
-export const MAX_SLOTS = 3;
+/** The bay has one slot per enhanceable piece, in this order. A slot holds at most one mod. */
+export const SLOT_PIECES: PieceKind[] = ['knight', 'rook', 'bishop', 'pawn'];
+export const MAX_SLOTS = SLOT_PIECES.length;
+
+/** Mod ids for a loadout, one per piece slot, in slot order (the later id wins a slot). */
+export function normalizeLoadout(ids: string[]): string[] {
+  const bySlot = new Map<PieceKind, string>();
+  for (const id of ids) {
+    const info = MODS.find((m) => m.id === id);
+    if (info && SLOT_PIECES.includes(info.piece)) bySlot.set(info.piece, id);
+  }
+  return SLOT_PIECES.flatMap((p) => (bySlot.has(p) ? [bySlot.get(p)!] : []));
+}
+
+/** The mod seated in a piece's slot, if any. */
+export const slotMod = (ids: string[], piece: PieceKind): string | undefined =>
+  ids.find((id) => MODS.find((m) => m.id === id)?.piece === piece);
 
 export const modInfo = (id: string): ModInfo | undefined => MODS.find((m) => m.id === id);
 

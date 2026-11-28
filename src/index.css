@@ -483,7 +483,7 @@ html, body, #root {
 .bay-lock { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); }
 @keyframes led-breathe { 50% { opacity: .55; } }
 
-.bay-slots { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; min-height: 0; }
+.bay-slots { flex: 1; display: grid; grid-template-columns: repeat(var(--slots, 4), minmax(0, 1fr)); gap: 6px; min-height: 0; }
 .bay-slot {
   position: relative; padding: 0; border: 0; background: none; cursor: pointer; overflow: visible;
   display: flex; align-items: flex-end; justify-content: center; touch-action: manipulation;
@@ -500,7 +500,15 @@ html, body, #root {
   background: repeating-linear-gradient(90deg, #6b5a2a 0 3px, transparent 3px 6px); opacity: .7;
 }
 .bay-slot.is-empty { border: 1px dashed color-mix(in srgb, var(--muted) 45%, transparent); border-bottom: 0; border-radius: 4px 4px 0 0; }
-.bay-empty-label { position: absolute; top: 16px; left: 0; right: 0; font-size: 10px; font-weight: 800; letter-spacing: .16em; color: var(--muted); }
+.bay-empty-label {
+  position: absolute; top: 12px; left: 0; right: 0;
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+  font-size: 9.5px; font-weight: 800; letter-spacing: .14em; color: var(--muted); line-height: 1.15; text-align: left;
+}
+.bay-empty-label small { display: block; font-size: 8px; letter-spacing: .12em; opacity: .75; }
+.bay-empty-label .piece-icon { flex: none; opacity: .85; }
+.bay-slot.is-lab .bay-empty-label { opacity: .5; }
+.bay-slot.is-lab { border-style: dotted; }
 .bay-slot.is-empty:not(:disabled):hover .bay-empty-label { color: var(--accent); }
 
 .bay-cart { position: relative; z-index: 1; width: 100%; height: auto; margin-bottom: 3px; display: block; filter: drop-shadow(0 -2px 6px color-mix(in srgb, var(--shell) 35%, transparent)); }
@@ -667,7 +675,7 @@ html, body, #root {
   justify-content: flex-start; padding: 2px 0;
 }
 .mod-bay.is-vertical .bay-status { margin-left: 0; margin-top: auto; }
-.mod-bay.is-vertical .bay-slots { grid-template-columns: 1fr; grid-template-rows: repeat(3, 1fr); gap: 6px; padding-right: 0; }
+.mod-bay.is-vertical .bay-slots { grid-template-columns: 1fr; grid-template-rows: repeat(var(--slots, 4), minmax(0, 1fr)); gap: 6px; padding-right: 0; }
 .mod-bay.is-vertical .bay-slot-inner {
   inset: auto; left: 50%; top: 50%;
   transform: translate(-50%, -50%) rotate(-90deg);

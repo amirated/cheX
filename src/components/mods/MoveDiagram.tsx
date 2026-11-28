@@ -1,5 +1,8 @@
 import type { ModInfo } from '../../variants/catalog';
 
+// \uFE0E asks for the text form: iOS otherwise draws the pawn as an emoji.
+const GLYPH: Record<string, string> = { knight: '♞\uFE0E', bishop: '♝\uFE0E', rook: '♜\uFE0E', pawn: '♟\uFE0E' };
+
 /** 7×7 board around the piece: what it already does (dots) and what the mod adds (shell-coloured). */
 export function MoveDiagram({ mod }: { mod: ModInfo }) {
   const N = 7;
@@ -23,7 +26,7 @@ export function MoveDiagram({ mod }: { mod: ModInfo }) {
         );
       })}
       <text x={C * cell + cell / 2} y={C * cell + cell / 2 + 6} textAnchor="middle" className="md-piece">
-        {mod.piece === 'knight' ? '♞' : mod.piece[0].toUpperCase()}
+        {GLYPH[mod.piece] ?? mod.piece[0].toUpperCase()}
       </text>
     </svg>
   );

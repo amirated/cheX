@@ -193,3 +193,95 @@ describe('replayGame (move review + captured pieces)', () => {
     expect(Object.keys(r.boards[1].pieces)).toHaveLength(32);
   });
 });
+
+describe('mod: pawnRam', () => {
+  const sqr = (n: string) => ({ file: n.charCodeAt(0) - 97, rank: Number(n[1]) - 1 });
+  const ram = (f: string, ids = ['pawnRam']) => ({ ...fen(f), ruleset: rulesetFor(ids) });
+  const rams = (s: GameState) => legal(s).filter((m) => m.flags.includes('mod:pawnRam'));
+  const at = (m: { from: { file: number; rank: number }; to: { file: number; rank: number } }) =>
+    `${String.fromCharCode(97 + m.from.file)}${m.from.rank + 1}${String.fromCharCode(97 + m.to.file)}${m.to.rank + 1}`;
+
+  it('captures the piece straight ahead, only with the mod, in each side’s direction', () => {
+    const f = '4k3/8/8/3pn3/3BP3/8/8/4K3 w - - 0 1';
+    expect(rams(ram(f, []))).toHaveLength(0);
+    expect(rams(ram(f)).map(at)).toEqual(['e4e5']);
+    expect(rams(ram('4k3/8/8/3pn3/3BP3/8/8/4K3 b - - 0 1')).map(at)).toEqual(['d5d4']);
+  });
+
+  it('never moves onto an empty square or a friendly piece', () => {
+    expect(rams(ram('4k3/8/8/4N3/4P3/8/3P4/4K3 w - - 0 1'))).toHaveLength(0);
+  });
+
+  it('a ready ram checks the king in front of it; a spent one does not', () => {
+    const s = ram('4k3/4P3/8/8/8/8/8/4K3 b - - 0 1');
+    expect(sideCheck(s)).toBe(true);
+    expect(sideCheck({ ...s, ruleset: rulesetFor([]) })).toBe(false);
+    const id = Object.values(s.board.pieces).find((p) => p.kind === 'pawn')!.id;
+    expect(sideCheck({ ...s, ruleset: { ...s.ruleset, modifiers: [withUse(s.ruleset.modifiers[0], id, 0)] } })).toBe(false);
+  });
+
+  it('ramming onto the last rank promotes and spends the charge', () => {
+    const s = ram('3rk3/3P4/8/8/8/8/8/4K3 w - - 0 1');
+    expect(rams(s)).toHaveLength(4);
+    const next = reduce(s, { type: 'move', from: sqr('d7'), to: sqr('d8'), promotion: 'queen' });
+    expect(next.board.pieces[next.board.squares[7 * 8 + 3]!].kind).toBe('queen');
+    expect(next.history[0].flags).toContain('mod:pawnRam');
+  });
+
+  it('level 1: each pawn rams once', () => {
+    let s = ram('4k3/8/3p4/3P4/8/4p3/4P3/4K3 w - - 0 1');
+    expect(rams(s)).toHaveLength(2);
+    s = reduce(reduce(s, { type: 'move', from: sqr('e2'), to: sqr('e3') }), { type: 'move', from: sqr('e8'), to: sqr('f8') });
+    expect(rams(s).map(at)).toEqual(['d5d6']);
+  });
+
+  it('bay keeps one cartridge per piece slot, in slot order', async () => {
+    const { normalizeLoadout } = await import('../src/variants/catalog');
+    expect(normalizeLoadout(['pawnRam', 'knightCamel', 'nope', 'pawnRam'])).toEqual(['knightCamel', 'pawnRam']);
+  });
+});
+
+describe('mods: rookSlip and bishopShift', () => {
+  const sqr = (n: string) => ({ file: n.charCodeAt(0) - 97, rank: Number(n[1]) - 1 });
+  const name = (c: { file: number; rank: number }) => `${String.fromCharCode(97 + c.file)}${c.rank + 1}`;
+  const withMods = (f: string, ids: string[]) => ({ ...fen(f), ruleset: rulesetFor(ids) });
+  const modMoves = (s: GameState, id: string) =>
+    legal(s).filter((m) => m.flags.includes(`mod:${id}`)).map((m) => `${name(m.from)}${name(m.to)}`).sort();
+
+  it('a rook steps one square diagonally, only with the mod', () => {
+    const f = '4k3/8/8/8/3R4/8/8/4K3 w - - 0 1';
+    expect(modMoves(withMods(f, []), 'rookSlip')).toEqual([]);
+    expect(modMoves(withMods(f, ['rookSlip']), 'rookSlip')).toEqual(['d4c3', 'd4c5', 'd4e3', 'd4e5']);
+  });
+
+  it('a bishop steps one square orthogonally, changing colour', () => {
+    const f = '4k3/8/8/8/3B4/8/8/4K3 w - - 0 1';
+    expect(modMoves(withMods(f, ['bishopShift']), 'bishopShift')).toEqual(['d4c4', 'd4d3', 'd4d5', 'd4e4']);
+  });
+
+  it('ready pieces threaten their extra squares; plain ones do not', () => {
+    // Black king e5; white rook d4 (diagonal neighbour) / bishop e4 (orthogonal neighbour).
+    expect(sideCheck(withMods('8/8/8/4k3/3R4/8/8/K7 b - - 0 1', ['rookSlip']))).toBe(true);
+    expect(sideCheck(withMods('8/8/8/4k3/3R4/8/8/K7 b - - 0 1', []))).toBe(false);
+    expect(sideCheck(withMods('8/8/8/4k3/4B3/8/8/K7 b - - 0 1', ['bishopShift']))).toBe(true);
+    expect(sideCheck(withMods('8/8/8/4k3/4B3/8/8/K7 b - - 0 1', []))).toBe(false);
+  });
+
+  it('level 1: one slip per rook, and a slipped rook can no longer castle', () => {
+    let s = createGameState(standardBoard(), rulesetFor(['rookSlip']));
+    const go = (a: string, b: string) => (s = reduce(s, { type: 'move', from: sqr(a), to: sqr(b) }));
+    go('g2', 'g3'); go('a7', 'a6'); go('g1', 'f3'); go('b7', 'b6'); go('f1', 'g2'); go('c7', 'c6');
+    expect(modMoves(s, 'rookSlip')).toEqual([]); // h1 rook's diagonal g2 is occupied
+    go('g2', 'h3'); go('d7', 'd6');
+    expect(modMoves(s, 'rookSlip')).toEqual(['h1g2']);
+    go('h1', 'g2'); go('e7', 'e6');
+    go('g2', 'h1'); go('f7', 'f6');
+    expect(modMoves(s, 'rookSlip')).toEqual([]); // spent
+    expect(legal(s).some((m) => m.flags.includes('castleKingside'))).toBe(false); // the rook has moved
+  });
+
+  it('the four slots each take one cartridge', async () => {
+    const { normalizeLoadout } = await import('../src/variants/catalog');
+    expect(normalizeLoadout(['pawnRam', 'bishopShift', 'rookSlip', 'knightCamel'])).toEqual(['knightCamel', 'rookSlip', 'bishopShift', 'pawnRam']);
+  });
+});
