@@ -1,4 +1,4 @@
-import type { ActiveRuleModifier, JsonObject } from '../../types/game';
+import type { ActiveRuleModifier, JsonObject, Ruleset } from '../../types/game';
 
 /**
  * Mod charges and cooldown.
@@ -59,3 +59,20 @@ export const modOfFlag = (flag: string): string | null => (flag.startsWith(MOD_F
 /** The mod a move used, if any. */
 export const modOfMove = (move: { flags: string[] }): string | null =>
   move.flags.map(modOfFlag).find((m): m is string => m !== null) ?? null;
+
+/**
+ * The same rules with every piece's charges full again: a new game (rematch, reset) keeps
+ * each mod and its level but forgets the previous game's uses.
+ * Mirrors `fresh_ruleset` in cheX-BE `engine/charges.rs`.
+ */
+export function freshRuleset(ruleset: Ruleset): Ruleset {
+  if (!ruleset.modifiers.some((m) => 'uses' in m.data)) return ruleset;
+  return {
+    ...ruleset,
+    modifiers: ruleset.modifiers.map((m) => {
+      if (!('uses' in m.data)) return m;
+      const { uses: _spent, ...data } = m.data;
+      return { ...m, data };
+    }),
+  };
+}

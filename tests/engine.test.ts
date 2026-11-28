@@ -285,3 +285,17 @@ describe('mods: rookSlip and bishopShift', () => {
     expect(normalizeLoadout(['pawnRam', 'bishopShift', 'rookSlip', 'knightCamel'])).toEqual(['knightCamel', 'rookSlip', 'bishopShift', 'pawnRam']);
   });
 });
+
+describe('rematch', () => {
+  // Regression (room 8LD47D): a rematch kept the previous game's used charges.
+  it('restores every charge and keeps the mods and their level', () => {
+    const sqr = (n: string) => ({ file: n.charCodeAt(0) - 97, rank: Number(n[1]) - 1 });
+    let s: GameState = { ...fen('4k3/8/8/3p4/3P4/8/8/4K3 b - - 0 1'), ruleset: rulesetFor(['bishopShift', 'knightCamel', 'pawnRam', 'rookSlip'], () => 2) };
+    s = reduce(s, { type: 'move', from: sqr('d5'), to: sqr('d4') });
+    expect(s.ruleset.modifiers.find((m) => m.id === 'pawnRam')!.data.uses).toBeDefined();
+    for (const next of [reduce(s, { type: 'reset', ruleset: s.ruleset }), reduce(s, { type: 'reset' })]) {
+      expect(next.ply).toBe(0);
+      expect(next.ruleset).toEqual(rulesetFor(['bishopShift', 'knightCamel', 'pawnRam', 'rookSlip'], () => 2));
+    }
+  });
+});

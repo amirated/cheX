@@ -16,7 +16,7 @@ import { createEmptyBoard, indexOf, opposite, sameCoord, squareName } from './bo
 import { applyEffects } from './effects';
 import { legalMoves, sideInCheck } from './legal';
 import { getPieceDef } from './pieces/registry';
-import { modOfMove, withUse } from './rules/charges';
+import { modOfMove, withUse, freshRuleset } from './rules/charges';
 import { activeModifiersFor, enhancementsOf } from './rules/modifiers';
 
 export const STANDARD_RULESET: Ruleset = { name: 'standard', modifiers: [] };
@@ -44,7 +44,10 @@ export function standardBoard(): BoardState {
   return b;
 }
 
-/** `nextSeq` lets a reset keep event sequence numbers monotonic across games in a room. */
+/**
+ * `nextSeq` lets a reset keep event sequence numbers monotonic across games in a room.
+ * Every new game starts with full mod charges, whatever ruleset it is handed.
+ */
 export function createGameState(
   board: BoardState = standardBoard(),
   ruleset: Ruleset = STANDARD_RULESET,
@@ -60,7 +63,7 @@ export function createGameState(
     halfmoveClock: 0,
     fullmoveNumber: 1,
     ply: 0,
-    ruleset,
+    ruleset: freshRuleset(ruleset),
     history: [],
     events: [],
     nextSeq,
