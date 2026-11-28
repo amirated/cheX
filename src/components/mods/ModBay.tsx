@@ -1,5 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react';
-import { MAX_SLOTS, modInfo } from '../../variants/catalog';
+import { MAX_SLOTS, MODS, SLOT_PIECES, modInfo, slotMod } from '../../variants/catalog';
+import { PieceIcon } from '../PieceIcon';
+import type { PieceLook } from '../../render/theme';
 import { BayCartridge } from './Cartridge';
 
 interface Props {
@@ -25,13 +27,16 @@ const RAIL = 14;
 const GAP = 6;
 const PAD = 6;
 
+/** Muted outline used for the piece badge on each slot. */
+const SLOT_LOOK: PieceLook = { fill: 0x2a2d3a, fillAlpha: 1, stroke: 0x8a8fa3, accent: 0x8a8fa3, rim: null, glowAlpha: 0 };
+
 /**
- * The console's cartridge bay, mounted on the board's edge. One slot per mod; a combo
- * game simply shows several cartridges side by side. In landscape the bay runs down the
- * board's left edge and the cartridges turn to face the board.
+ * The console's cartridge bay, mounted on the board's edge. One slot per enhanceable piece
+ * (knight, rook, bishop, pawn); a combo game shows several cartridges side by side. In
+ * landscape the bay runs down the board's left edge and the cartridges turn to face the board.
  */
 export function ModBay({ mods, editable, onOpenLibrary, onEject, fresh, levels, vertical = false, length }: Props) {
-  const slots = Array.from({ length: MAX_SLOTS }, (_, i) => mods[i] ?? null);
+  const slots = SLOT_PIECES.map((piece) => ({ piece, id: slotMod(mods, piece) ?? null }));
   const loaded = mods.length;
   // In vertical mode each slot's contents are laid out horizontally, then rotated.
   const slotLen = (length - PAD * 2 - GAP * (MAX_SLOTS - 1)) / MAX_SLOTS;
@@ -48,6 +53,7 @@ export function ModBay({ mods, editable, onOpenLibrary, onEject, fresh, levels, 
       aria-label="Mod bay"
       style={{
         ['--mod-color' as string]: modInfo(mods[0] ?? '')?.shell ?? 'var(--accent)',
+        ['--slots' as string]: MAX_SLOTS,
         ...(vertical ? { height: length } : {}),
       }}
     >
@@ -68,7 +74,7 @@ export function ModBay({ mods, editable, onOpenLibrary, onEject, fresh, levels, 
         )}
       </div>
       <div className="bay-slots">
-        {slots.map((id, i) => {
+        {slots.map(({ piece, id }) => {
           const mod = id ? modInfo(id) : undefined;
           if (mod) {
             return (
@@ -90,18 +96,28 @@ export function ModBay({ mods, editable, onOpenLibrary, onEject, fresh, levels, 
               </button>
             );
           }
+          // Empty slot: the piece it takes, and whether any cartridge exists for it yet.
+          const inLab = !MODS.some((m) => m.piece === piece);
           return (
             <button
-              key={`empty-${i}`}
+              key={`empty-${piece}`}
               type="button"
-              className="bay-slot is-empty"
+              className={`bay-slot is-empty${inLab ? ' is-lab' : ''}`}
               disabled={!editable}
               onClick={onOpenLibrary}
-              aria-label={editable ? 'Empty slot: open the mod library' : 'Empty slot'}
+              aria-label={
+                inLab ? `${piece} slot: no cartridge yet` : editable ? `Empty ${piece} slot: open the mod library` : `Empty ${piece} slot`
+              }
             >
               {wrap(
                 <>
-                  <span className="bay-empty-label">{editable ? '+ MOD' : `SLOT ${i + 1}`}</span>
+                  <span className="bay-empty-label">
+                    <PieceIcon kind={piece} look={SLOT_LOOK} size={18} />
+                    <span>
+                      {piece.toUpperCase()}
+                      <small>{inLab ? 'IN LAB' : editable ? '+ MOD' : 'EMPTY'}</small>
+                    </span>
+                  </span>
                   <span className="bay-port" />
                 </>,
               )}

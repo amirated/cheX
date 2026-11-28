@@ -40,9 +40,9 @@ There are two cyber themes, **Neon grid** and **Night city** (the default), and 
 
 ## Mods (game variants)
 
-A mod changes one rule and can be switched on or off per game; classic chess is simply a game with no mods. The first one is **NC-01 Camel Knight**: knights may also make a (3,1) camel leap.
+A mod changes one rule and can be switched on or off per game; classic chess is simply a game with no mods. Four are in the game, one per bay slot, each chosen from the cheX-research self-play study: **NC-01 Camel Knight** (knights may also make a (3,1) camel leap), **RS-01 Slipping Rook** (rooks may also step one square diagonally), **BS-01 Shifting Bishop** (bishops may also step one square orthogonally, changing colour) and **PR-01 Battering Ram** (pawns may also capture the piece directly in front of them).
 
-- **In the app:** mods are cartridges. The **mod bay** on top of the board has three slots. Tap an empty slot (or the cartridge icon in the header) to open the **mod library**, which shows each mod's description, rules, a move diagram and lab notes from the cheX-research study. Plugging or ejecting a cartridge restarts a local game with the new rules. Quick match and "Play a friend" use whatever is in the bay; online rooms lock their mods for the whole room, rematches included. Pieces changed by a mod carry a small chip in the cartridge colour, and moves that only exist because of a mod are drawn as diamonds in that colour.
+- **In the app:** mods are cartridges. The **mod bay** on top of the board has one slot per piece: knight, rook, bishop and pawn (`SLOT_PIECES` in `variants/catalog.ts`). Plugging a cartridge into a filled slot swaps it; a slot with no cartridge available shows "in lab". Tap an empty slot (or the cartridge icon in the header) to open the **mod library**, which shows each mod's description, rules, a move diagram and lab notes from the cheX-research study. Plugging or ejecting a cartridge restarts a local game with the new rules. Quick match and "Play a friend" use whatever is in the bay; online rooms lock their mods for the whole room, rematches included. Pieces changed by a mod carry a small chip in the cartridge colour, and moves that only exist because of a mod are drawn as diamonds in that colour.
 - **Levels, charges, cooldown:** each enhanced piece may use its mod as many times per game as its level (1–3), with a one-turn cooldown after every use. A spent or cooling piece moves and threatens only normally. Levels will come from player progression; for now everyone is level 1 (`src/variants/progression.ts`), and online games use the lower of the two players' levels (decided by the server). The library's **Rules** tab explains all this and the **Codex** tab holds the lore; both live in `src/variants/codex.ts`.
 - **In the engine:** a mod is a rule modifier with an `extraMovement(kind, color)` hook (`src/engine/rules/modifiers.ts`). Charges and cooldown are generic (`src/engine/rules/charges.ts`): move generation adds a piece's enhanced moves only while it has a charge and is off cooldown, flags them `mod:<id>`, and applying such a move records the use in the modifier's `data` (`{ level, uses: { pieceId: [count, lastPly] } }`). Attacks, check, mate and the insufficient-material rule all use the same availability, judged at the owner's next move. `rulesetFor(ids, levelOf)` in `src/variants/catalog.ts` builds the canonical ruleset.
 - **On screen, for any piece mod:** chips on each enhanced piece show its charges (bright, dim while cooling, hollow when spent); moves that spend a charge are drawn as diamonds in the cartridge colour; selecting the piece shows a status line under the board; ◆ marks charged moves in the log; firing a charge plays its own sound and a burst in the cartridge colour.
@@ -94,10 +94,10 @@ src/
 │   └── TimeControlPicker.tsx  # presets / custom / no clock
 ├── hooks/                     # useChessGame (transport → React), useBoardSize
 ├── net/                       # GameTransport seam: LocalTransport (offline), SocketTransport (cheX-BE server), matchmaking
-├── variants/                  # mod catalog (library text, rulesetFor), loadout (this device's bay), knightCamel
+├── variants/                  # mod catalog (library text, rulesetFor), loadout (this device's bay), knightCamel, rookSlip, bishopShift, pawnRam
 └── App.tsx / main.tsx / index.css
 tests/engine.test.ts           # perft: start d4, Kiwipete d3, positions 3/4/5, reducer tests, mods
-scripts/mod-parity-fixture.ts  # records a camel-knight game for the Rust parity test
+scripts/mod-parity-fixture.ts  # records a modded game for the Rust parity tests (mods, level, seed are arguments)
 ```
 
 ## Extending

@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { MAX_SLOTS, MODS } from '../../variants/catalog';
+import { MODS, SLOT_PIECES, modInfo, slotMod } from '../../variants/catalog';
 import { CODEX, LEVELS, RULES } from '../../variants/codex';
 import { MAX_LEVEL, playerLevel } from '../../variants/progression';
 import { Cartridge } from './Cartridge';
@@ -20,7 +20,6 @@ interface Props {
 type Tab = 'cartridges' | 'rules' | 'codex';
 
 export function ModLibrary({ loadout, active, editable, onToggle, onClose }: Props) {
-  const full = loadout.length >= MAX_SLOTS;
   const [tab, setTab] = useState<Tab>('cartridges');
   const scrollRef = useRef<HTMLDivElement>(null);
   // Each tab opens at its top; only this panel scrolls, the header and tabs stay put.
@@ -57,6 +56,8 @@ export function ModLibrary({ loadout, active, editable, onToggle, onClose }: Pro
       {MODS.map((mod) => {
         const inBay = loadout.includes(mod.id);
         const inGame = active.includes(mod.id);
+        // Another cartridge in this piece's slot gets swapped out.
+        const rival = inBay ? undefined : modInfo(slotMod(loadout, mod.piece) ?? '');
         return (
           <article key={mod.id} className={`lib-card${inBay ? ' is-in-bay' : ''}`} style={{ ['--shell' as string]: mod.shell }}>
             <div className="lib-top">
@@ -74,13 +75,8 @@ export function ModLibrary({ loadout, active, editable, onToggle, onClose }: Pro
                   {playerLevel(mod.id)} {mod.ability.toLowerCase()}
                   {playerLevel(mod.id) === 1 ? '' : 's'} per {mod.piece} · levels {MAX_LEVEL > 1 ? `2–${MAX_LEVEL}` : ''} via progression
                 </span>
-                <button
-                  type="button"
-                  className={inBay ? 'ghost' : 'reset'}
-                  disabled={!inBay && full}
-                  onClick={() => onToggle(mod.id)}
-                >
-                  {inBay ? 'Eject' : full ? 'Bay full' : 'Plug in'}
+                <button type="button" className={inBay ? 'ghost' : 'reset'} onClick={() => onToggle(mod.id)}>
+                  {inBay ? 'Eject' : rival ? `Swap for ${rival.code}` : `Plug into ${mod.piece} slot`}
                 </button>
               </div>
             </div>
@@ -119,7 +115,13 @@ export function ModLibrary({ loadout, active, editable, onToggle, onClose }: Pro
         );
       })}
 
-      <p className="lib-more">More cartridges are in the lab. Combos: plug up to {MAX_SLOTS} at once.</p>
+      <p className="lib-more">
+        The bay has one slot per piece: {SLOT_PIECES.join(', ')}. Combine them freely.{' '}
+        {SLOT_PIECES.filter((p) => !MODS.some((m) => m.piece === p)).length > 0 &&
+          `${SLOT_PIECES.filter((p) => !MODS.some((m) => m.piece === p))
+            .map((p) => p[0].toUpperCase() + p.slice(1))
+            .join(' and ')} cartridges are still in the lab.`}
+      </p>
         </>
       )}
       </div>

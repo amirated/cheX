@@ -95,13 +95,15 @@ export function Cartridge({ mod, plugged = false, className = '', style }: Props
 }
 
 /**
- * The part of a cartridge you see sticking out of a bay slot: a wide shell top with
- * grip ridges, the label strip and a status LED. The edge connector is inside the port.
+ * The part of a cartridge you see sticking out of a bay slot: a shell top with grip ridges,
+ * the code block, the level chip, a pictogram of what it adds and a status LED. Narrow
+ * enough for four slots across a phone-width board; the full name is in the library.
  */
 export function BayCartridge({ mod, level }: { mod: ModInfo; level: number }) {
   const id = useId().replace(/:/g, '');
+  const [series, num = ''] = mod.code.split('-');
   return (
-    <svg className="bay-cart" viewBox="0 0 160 52" style={{ ['--shell' as string]: mod.shell }} aria-hidden>
+    <svg className="bay-cart" viewBox="0 0 104 52" style={{ ['--shell' as string]: mod.shell }} aria-hidden>
       <defs>
         <linearGradient id={`${id}-s`} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="var(--shell)" />
@@ -112,36 +114,31 @@ export function BayCartridge({ mod, level }: { mod: ModInfo; level: number }) {
           <stop offset=".45" stopColor="#fff" stopOpacity="0" />
         </linearGradient>
       </defs>
-      <path d="M8 1 H152 L159 8 V52 H1 V8 Z" fill={`url(#${id}-s)`} stroke="color-mix(in srgb, var(--shell) 35%, #000)" strokeWidth="1.5" />
-      <path d="M8 1 H152 L159 8 V20 H1 V8 Z" fill={`url(#${id}-g)`} />
-      {[0, 1, 2, 3].map((i) => (
-        <rect key={i} x={7 + i * 5} y="7" width="2.6" height="38" rx="1" fill="#000" opacity=".3" />
+      <path d="M7 1 H97 L103 7 V52 H1 V7 Z" fill={`url(#${id}-s)`} stroke="color-mix(in srgb, var(--shell) 35%, #000)" strokeWidth="1.5" />
+      <path d="M7 1 H97 L103 7 V20 H1 V7 Z" fill={`url(#${id}-g)`} />
+      {[0, 1, 2].map((i) => (
+        <rect key={i} x={6 + i * 4.5} y="8" width="2.4" height="36" rx="1" fill="#000" opacity=".3" />
       ))}
-      <rect x="30" y="7" width="114" height="38" rx="2.5" fill="#0b0d14" />
-      <rect x="30" y="7" width="40" height="38" rx="2.5" fill="var(--shell)" />
-      <rect x="62" y="7" width="8" height="38" fill="var(--shell)" />
-      <text x="50" y="23" className="bay-cart-code" textAnchor="middle">
-        {mod.code.split('-')[0]}
+      <rect x="22" y="7" width="76" height="38" rx="2.5" fill="#0b0d14" />
+      <rect x="22" y="7" width="34" height="38" rx="2.5" fill="var(--shell)" />
+      <rect x="50" y="7" width="6" height="38" fill="var(--shell)" />
+      <text x="39" y="23" className="bay-cart-code" textAnchor="middle">
+        {series}
       </text>
-      <text x="50" y="37" className="bay-cart-num" textAnchor="middle">
-        {mod.code.split('-')[1] ?? ''}
+      <text x="39" y="37" className="bay-cart-num" textAnchor="middle">
+        {num}
       </text>
-      <text x="70" y="22" className="bay-cart-name">
-        {mod.name.toUpperCase()}
-      </text>
-      <g transform="translate(138 32)">
-        {mod.diagram.added.map((v, i) => (
-          <rect key={i} x={v.dFile * 2.6 - 1} y={-v.dRank * 2.6 - 1} width="2" height="2" fill="var(--shell)" />
-        ))}
-        <circle r="1.5" fill="#fff" />
-      </g>
-      <rect x="70" y="29" width="26" height="11" rx="2" fill="var(--shell)" />
-      <text x="83" y="37.5" className="bay-cart-level" textAnchor="middle">
+      <rect x="60" y="11" width="23" height="11" rx="2" fill="var(--shell)" />
+      <text x="71.5" y="19.5" className="bay-cart-level" textAnchor="middle">
         LV{level}
       </text>
-      <rect x="100" y="30" width="18" height="2" fill="var(--shell)" opacity=".6" />
-      <rect x="100" y="35" width="12" height="2" fill="var(--shell)" opacity=".35" />
-      <circle className="cart-led" cx="153" cy="4.5" r="2" />
+      <g transform="translate(78 34)">
+        {mod.diagram.added.map((v, i) => (
+          <rect key={i} x={v.dFile * 2.4 - 1} y={-v.dRank * 2.4 - 1} width="2" height="2" fill="var(--shell)" />
+        ))}
+        <circle r="1.4" fill="#fff" />
+      </g>
+      <circle className="cart-led" cx="97" cy="4.5" r="2" />
     </svg>
   );
 }
